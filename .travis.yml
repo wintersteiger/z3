@@ -7,16 +7,25 @@ before_install: true
 
 install:
   - sudo apt-get install python
+  - sudo apt-get install ocaml
 
-before_script: true
+before_script: 
+  - git clone https://github.com/Z3Prover/z3test.git z3test
 
 env: MAKE_JOBS=4
 
 script:
   - jdk_switcher use oraclejdk8
-  - python scripts/mk_make.py --java
-  - cd build
-  - make
+#  - python scripts/mk_make.py --java --ml
+#  - cd build
+#  - make -j 4
+#  - make examples
+   - cd z3test
+   - python scripts/smalltest.py
+   - cd ..
+   - python scripts/mk_unix_dist.py --githash
+
+python scripts/mk_unix_dist.py --githash
 
 after_success: true
 
