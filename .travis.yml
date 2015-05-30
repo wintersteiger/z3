@@ -2,5 +2,24 @@ language: cpp
 compiler:
   - gcc
   - clang
-# Change this to your needs
-script: python scripts/mk_make.py && cd build && make
+
+before_install: true
+
+install:
+  - sudo apt-get install python
+
+before_script: true
+
+env: MAKE_JOBS=4
+
+script:
+  - jdk_switcher use oraclejdk8
+  - python scripts/mk_make.py --java
+  - cd build
+  - make
+
+after_success: true
+
+after_failure: true
+
+after_script: true
