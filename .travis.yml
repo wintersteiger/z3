@@ -12,7 +12,7 @@ install:
 before_script: 
   - git clone https://github.com/Z3Prover/z3test.git z3test
 
-env: MAKEJOBS=4
+env: Z3DIR=~/z3 MAKEJOBS=4
 
 script:
   - jdk_switcher use oraclejdk8
