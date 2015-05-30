@@ -20,7 +20,10 @@ script:
   - git show-ref --abbrev=12 refs/heads/build-ng
   - pwd
   - ls -l
-  - python z3test/scripts/smalltest.py
+  - export Z3DIR=`pwd`
+  - cd z3test
+  - python scripts/smalltest.py
+  - cd ..
   - python scripts/mk_unix_dist.py --githash
 
 after_success: true
