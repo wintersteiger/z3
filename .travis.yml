@@ -10,7 +10,7 @@ install:
   - sudo apt-get install ocaml
 
 before_script: 
-  - git clone https://github.com/Z3Prover/z3test.git z3test
+  - git clone https://github.com/Z3Prover/z3test.git z3test --branch build-ng
 
 env: MAKEJOBS=4
 
