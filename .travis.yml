@@ -16,6 +16,8 @@ env: MAKEJOBS=4
 
 script:
   - jdk_switcher use oraclejdk8
+  - git rev-parse --abbrev-ref HEAD
+  - git show-ref --abbrev=12 refs/head/build-ng
   - python z3test/scripts/smalltest.py
   - python scripts/mk_unix_dist.py --githash
 
