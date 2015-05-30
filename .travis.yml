@@ -3,4 +3,4 @@ compiler:
   - gcc
   - clang
 # Change this to your needs
-script: python scripts\mk_make.py && cd build && make
+script: python scripts/mk_make.py && cd build && make
