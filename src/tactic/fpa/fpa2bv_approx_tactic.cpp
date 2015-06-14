@@ -19,7 +19,7 @@
 #include"tactical.h"
 #include"cooperate.h"
 #include"ref_util.h"
-
+#include"fpa_rewriter.h"
 #include"th_rewriter.h"
 #include"bit_blaster_rewriter.h"
 #include"bit_blaster_model_converter.h"
@@ -79,6 +79,7 @@ class fpa2bv_approx_tactic: public tactic {
         model_ref m_fpa_model;
         fpa_util m_float_util;
         bv_util m_bv_util;
+        fpa_rewriter m_fpa_rewriter;
 
         imp(ast_manager & _m, params_ref const & p, fpa_approximation_mode mode) :
             m(_m),
@@ -90,7 +91,8 @@ class fpa2bv_approx_tactic: public tactic {
             m_mode(mode),
             m_temp_manager(0),
             m_float_util(_m),
-            m_bv_util(_m){
+            m_bv_util(_m),
+            m_fpa_rewriter(_m){
         }
 
         void updt_params(params_ref const & p) {
@@ -271,10 +273,8 @@ class fpa2bv_approx_tactic: public tactic {
                 bool & children_have_finite_err,
                 mpf * arg_val,
                 mpf * est_arg_val,
-                unsigned int * bv_args
-                //expr_ref * arg_e
+                rational * bv_arg_val
         ){
-
             expr_ref arg_e[] = { expr_ref(m), expr_ref(m), expr_ref(m), expr_ref(m) };
             unsigned i=0;
             int e_bits;
@@ -292,22 +292,46 @@ class fpa2bv_approx_tactic: public tactic {
                 i = 1;
             }
 
-            if (m_float_util.is_to_fp(rhs) || m_float_util.is_to_fp_unsigned(rhs) ){
-               expr * arg = rhs->get_arg(i);
-               rational r;
-               unsigned int bv_num;
-               mdl->eval(arg, arg_e[i],true);
-               m_bv_util.is_numeral(arg_e[i],r,bv_args[i]);
-//               mpf_mngr.set(arg_val[i],e_bits,s_bits,(int) bv_num);
-//               mpf * tmp = alloc(mpf);
-//               mpf_mngr.set(*tmp, arg_val[i]);
-//               actual_value.insert(arg, tmp);
-//               mpf_mngr.set(est_arg_val[i], *tmp);
+            if (m_float_util.is_to_fp(rhs)){
+                expr_ref res = expr_ref(m);
+
+
+//                ast_kind kinds[4];
+//                for (int j=0; j < 4; j++) {
+//                    if (j < rhs->get_num_args()) {
+//                        kinds[j] = rhs->get_arg()
+//                    }
+//                    else {
+//
+//                    }
+//
+//                }
+                expr * args[4];
+                for (unsigned j=0; j < rhs->get_num_args(); j++) {
+                    expr * arg = rhs->get_arg(i);
+                    mdl->eval(arg, arg_e[i],true);
+                    args[i] = arg_e[i].get();
+                }
+                m_fpa_rewriter.mk_to_fp(rhs->get_decl(),rhs->get_num_args(),args, res);
+
+
             }
             else {
+
+
                 //Collect argument values
                 for (; i < rhs->get_num_args(); i++) {
                     expr * arg = rhs->get_arg(i);
+
+                    if ( m_float_util.is_to_fp_unsigned(rhs) ){
+                                   expr * arg = rhs->get_arg(i);
+                                   rational r;
+                                   unsigned int bv_size;
+                                   mdl->eval(arg, arg_e[i],true);
+                                   bool q = m_bv_util.is_numeral(arg_e[i], bv_arg_val[i], bv_size);
+                                   SASSERT(q);
+                    }
+                    else  {
 
                     if (is_app(arg) && to_app(arg)->get_num_args() == 0) {
                         if (precise_op.contains(arg)) {
@@ -317,10 +341,10 @@ class fpa2bv_approx_tactic: public tactic {
                             /* that's okay */
                         }
                         else {
-    #ifdef Z3DEBUG
+        #ifdef Z3DEBUG
                             std::cout << "Not seen all children of " << mk_ismt2_pp(rhs, m) <<
                                     " (spec. " << mk_ismt2_pp(arg, m) << ")" << std::endl;
-    #endif
+        #endif
                             precise_children = false;
                             seen_all_children = false;
                             break;
@@ -349,6 +373,7 @@ class fpa2bv_approx_tactic: public tactic {
                     }
                     else
                         std::cout << "Estimated value missing: " << mk_ismt2_pp(arg,m) << std::endl;
+                    }
                 }
             }
         }
@@ -360,7 +385,7 @@ class fpa2bv_approx_tactic: public tactic {
                 mpf_rounding_mode & rm,
                 mpf * arg_val,
                 mpf * est_arg_val,
-                unsigned * bv_args,
+                rational * bv_arg_val,
                 mpf & rhs_value,
                 mpf & est_rhs_value){
 
@@ -409,8 +434,8 @@ class fpa2bv_approx_tactic: public tactic {
             {
                 unsigned ebits = rhs->get_decl()->get_parameter(0).get_int();
                 unsigned sbits = rhs->get_decl()->get_parameter(1).get_int();
-                mpf_mngr.set(rhs_value, ebits, sbits, rm, bv_args[1]);
-                mpf_mngr.set(est_rhs_value, ebits, sbits, rm, bv_args[1]);
+                mpf_mngr.set(rhs_value, ebits, sbits, rm, bv_arg_val[1].to_mpq());
+                mpf_mngr.set(est_rhs_value, ebits, sbits, rm, bv_arg_val[1].to_mpq());
                 break;
             }
             case OP_FPA_ABS:
@@ -537,7 +562,7 @@ class fpa2bv_approx_tactic: public tactic {
             app * rhs;
             mpf arg_val[4]; //First argument can be rounding mode
             mpf est_arg_val[4];
-            unsigned bv_args[4];
+            rational bv_arg_val[4];
             mpf lhs_value, rhs_value, est_rhs_value;
             mpf_rounding_mode rm;
 
@@ -573,14 +598,14 @@ class fpa2bv_approx_tactic: public tactic {
 //
 //                            default:
                                 obtain_values(rhs, mdl, full_mdl,mpf_mngr,cnst2term_map,precise_op,actual_value,
-                                    err_est, rm, precise_children, seen_all_children, children_have_finite_err, arg_val, est_arg_val, bv_args );
+                                    err_est, rm, precise_children, seen_all_children, children_have_finite_err, arg_val, est_arg_val, bv_arg_val);
                             //}
 
                             if (seen_all_children) {//If some arguments are not evaluated yet, skip
                                 if (rhs->get_num_args() == 0)
-                                    evaluate_constant(rhs,mdl,mpf_mngr,actual_value, rhs_value, est_rhs_value);
+                                    evaluate_constant(rhs, mdl, mpf_mngr, actual_value, rhs_value, est_rhs_value);
                                 else
-                                    full_semantics_eval(rhs,mpf_mngr,rm,arg_val,est_arg_val, bv_args, rhs_value, est_rhs_value);
+                                    full_semantics_eval(rhs, mpf_mngr, rm, arg_val, est_arg_val, bv_arg_val, rhs_value, est_rhs_value);
 
                                 if (mpf_mngr.eq(rhs_value, est_rhs_value)) {
                                     full_mdl->register_decl((to_app(lhs))->get_decl(), m_float_util.mk_value(est_rhs_value));
