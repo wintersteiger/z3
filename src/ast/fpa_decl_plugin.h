@@ -286,6 +286,8 @@ public:
 
     bool is_to_fp(expr * n) { return is_app_of(n, m_fid, OP_FPA_TO_FP); }
 
+    bool is_to_fp_unsigned(expr * n) { return is_app_of(n, m_fid, OP_FPA_TO_FP_UNSIGNED); }
+
     app * mk_to_ubv(expr * rm, expr * t, unsigned sz) {         
         parameter ps[] = { parameter(sz) };
         expr * args[] = { rm, t };

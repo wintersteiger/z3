@@ -78,6 +78,7 @@ class fpa2bv_approx_tactic: public tactic {
         ast_manager * m_temp_manager;
         model_ref m_fpa_model;
         fpa_util m_float_util;
+        bv_util m_bv_util;
 
         imp(ast_manager & _m, params_ref const & p, fpa_approximation_mode mode) :
             m(_m),
@@ -88,7 +89,8 @@ class fpa2bv_approx_tactic: public tactic {
             m_cancel(false),
             m_mode(mode),
             m_temp_manager(0),
-            m_float_util(_m) {
+            m_float_util(_m),
+            m_bv_util(_m){
         }
 
         void updt_params(params_ref const & p) {
@@ -268,64 +270,87 @@ class fpa2bv_approx_tactic: public tactic {
                 bool & seen_all_children,
                 bool & children_have_finite_err,
                 mpf * arg_val,
-                mpf * est_arg_val
+                mpf * est_arg_val,
+                unsigned int * bv_args
                 //expr_ref * arg_e
         ){
 
             expr_ref arg_e[] = { expr_ref(m), expr_ref(m), expr_ref(m), expr_ref(m) };
             unsigned i=0;
+            int e_bits;
+            int s_bits;
             //Set rounding mode
             if (rhs->get_num_args() > 0 && m_float_util.is_rm(rhs->get_arg(0))) {
                 expr_ref rm_val(m);
                 mdl->eval(rhs->get_arg(0), rm_val, true);
                 m_float_util.is_rm_numeral(rm_val, rm);
+                func_decl * f = rhs->get_decl();
+                if (f->get_num_parameters() >= 2) {
+                    e_bits = f->get_parameter(0).get_int();
+                    s_bits = f->get_parameter(1).get_int();
+                }
                 i = 1;
             }
-            //Collect argument values
-            for (; i < rhs->get_num_args(); i++) {
-                expr * arg = rhs->get_arg(i);
 
-                if (is_app(arg) && to_app(arg)->get_num_args() == 0) {
-                    if (precise_op.contains(arg)) {
-                        precise_children &= precise_op.find(arg);
-                    }
-                    else if (!cnst2term_map.contains(to_app(arg)->get_decl())) {
-                        /* that's okay */
-                    }
-                    else {
-#ifdef Z3DEBUG
-                        std::cout << "Not seen all children of " << mk_ismt2_pp(rhs, m) <<
-                                " (spec. " << mk_ismt2_pp(arg, m) << ")" << std::endl;
-#endif
-                        precise_children = false;
-                        seen_all_children = false;
-                        break;
-                    }
-                }
-
-                // Value from small model
-                mdl->eval(arg, arg_e[i],true);
-                m_float_util.is_numeral(arg_e[i], arg_val[i]);
-
-                if( children_have_finite_err &&
-                        err_est.contains(arg) &&
-                        isinfinite(err_est.find(arg)))
-                    children_have_finite_err=false;
-
-                if (actual_value.contains(arg))
-                    mpf_mngr.set(est_arg_val[i], *actual_value.find(arg));
-                else if (seen_all_children && is_app(arg) && to_app(arg)->get_num_args()==0) {
-                    //We have seen all children so if it is a constant and not in actual_value then
-                    //it is an input variable and its est_val is the same as actual value
-                    mpf * tmp = alloc(mpf);
-                    mpf_mngr.set(*tmp, arg_val[i]);
-                    actual_value.insert(arg, tmp);
-                    mpf_mngr.set(est_arg_val[i], *tmp);
-                }
-                else
-                    std::cout << "Estimated value missing: " << mk_ismt2_pp(arg,m) << std::endl;
+            if (m_float_util.is_to_fp(rhs) || m_float_util.is_to_fp_unsigned(rhs) ){
+               expr * arg = rhs->get_arg(i);
+               rational r;
+               unsigned int bv_num;
+               mdl->eval(arg, arg_e[i],true);
+               m_bv_util.is_numeral(arg_e[i],r,bv_args[i]);
+//               mpf_mngr.set(arg_val[i],e_bits,s_bits,(int) bv_num);
+//               mpf * tmp = alloc(mpf);
+//               mpf_mngr.set(*tmp, arg_val[i]);
+//               actual_value.insert(arg, tmp);
+//               mpf_mngr.set(est_arg_val[i], *tmp);
             }
+            else {
+                //Collect argument values
+                for (; i < rhs->get_num_args(); i++) {
+                    expr * arg = rhs->get_arg(i);
 
+                    if (is_app(arg) && to_app(arg)->get_num_args() == 0) {
+                        if (precise_op.contains(arg)) {
+                            precise_children &= precise_op.find(arg);
+                        }
+                        else if (!cnst2term_map.contains(to_app(arg)->get_decl())) {
+                            /* that's okay */
+                        }
+                        else {
+    #ifdef Z3DEBUG
+                            std::cout << "Not seen all children of " << mk_ismt2_pp(rhs, m) <<
+                                    " (spec. " << mk_ismt2_pp(arg, m) << ")" << std::endl;
+    #endif
+                            precise_children = false;
+                            seen_all_children = false;
+                            break;
+                        }
+                    }
+
+
+                    // Value from small model
+                    mdl->eval(arg, arg_e[i],true);
+                    m_float_util.is_numeral(arg_e[i], arg_val[i]);
+
+                    if( children_have_finite_err &&
+                            err_est.contains(arg) &&
+                            isinfinite(err_est.find(arg)))
+                        children_have_finite_err=false;
+
+                    if (actual_value.contains(arg))
+                        mpf_mngr.set(est_arg_val[i], *actual_value.find(arg));
+                    else if (seen_all_children && is_app(arg) && to_app(arg)->get_num_args()==0) {
+                        //We have seen all children so if it is a constant and not in actual_value then
+                        //it is an input variable and its est_val is the same as actual value
+                        mpf * tmp = alloc(mpf);
+                        mpf_mngr.set(*tmp, arg_val[i]);
+                        actual_value.insert(arg, tmp);
+                        mpf_mngr.set(est_arg_val[i], *tmp);
+                    }
+                    else
+                        std::cout << "Estimated value missing: " << mk_ismt2_pp(arg,m) << std::endl;
+                }
+            }
         }
 
 
@@ -335,6 +360,7 @@ class fpa2bv_approx_tactic: public tactic {
                 mpf_rounding_mode & rm,
                 mpf * arg_val,
                 mpf * est_arg_val,
+                unsigned * bv_args,
                 mpf & rhs_value,
                 mpf & est_rhs_value){
 
@@ -377,6 +403,14 @@ class fpa2bv_approx_tactic: public tactic {
                 unsigned sbits = rhs->get_decl()->get_parameter(1).get_int();
                 mpf_mngr.set(rhs_value, ebits, sbits, rm, arg_val[1]);
                 mpf_mngr.set(est_rhs_value, ebits, sbits, rm, est_arg_val[1]);
+                break;
+            }
+            case OP_FPA_TO_FP_UNSIGNED:
+            {
+                unsigned ebits = rhs->get_decl()->get_parameter(0).get_int();
+                unsigned sbits = rhs->get_decl()->get_parameter(1).get_int();
+                mpf_mngr.set(rhs_value, ebits, sbits, rm, bv_args[1]);
+                mpf_mngr.set(est_rhs_value, ebits, sbits, rm, bv_args[1]);
                 break;
             }
             case OP_FPA_ABS:
@@ -503,6 +537,7 @@ class fpa2bv_approx_tactic: public tactic {
             app * rhs;
             mpf arg_val[4]; //First argument can be rounding mode
             mpf est_arg_val[4];
+            unsigned bv_args[4];
             mpf lhs_value, rhs_value, est_rhs_value;
             mpf_rounding_mode rm;
 
@@ -520,7 +555,7 @@ class fpa2bv_approx_tactic: public tactic {
                         rhs = cnst2term_map.find(cnsts.get(i));
                         if (precise_op.contains(lhs))//already visited, skip
                                 return;
-
+                        std::cout << "Evaluating: " << mk_ismt2_pp(rhs,m) << std::endl;
                         mdl->eval(lhs, lhs_eval, true);
 
                         if (m_float_util.is_numeral(lhs_eval, lhs_value)) {//OLD:is_value
@@ -528,15 +563,24 @@ class fpa2bv_approx_tactic: public tactic {
                             bool seen_all_children = true;
                             bool children_have_finite_err = true;
 
-                            obtain_values(rhs, mdl, full_mdl,mpf_mngr,cnst2term_map,precise_op,actual_value,
-                                    err_est, rm, precise_children, seen_all_children, children_have_finite_err, arg_val, est_arg_val );
-
+//                            switch(rhs->get_decl_kind()){
+//
+//                            case OP_FPA_TO_FP:
+//                            case OP_FPA_TO_FP_UNSIGNED:
+//
+//                            case OP_FPA_TO_UBV:
+//                            case OP_FPA_TO_SBV:
+//
+//                            default:
+                                obtain_values(rhs, mdl, full_mdl,mpf_mngr,cnst2term_map,precise_op,actual_value,
+                                    err_est, rm, precise_children, seen_all_children, children_have_finite_err, arg_val, est_arg_val, bv_args );
+                            //}
 
                             if (seen_all_children) {//If some arguments are not evaluated yet, skip
                                 if (rhs->get_num_args() == 0)
                                     evaluate_constant(rhs,mdl,mpf_mngr,actual_value, rhs_value, est_rhs_value);
                                 else
-                                    full_semantics_eval(rhs,mpf_mngr,rm,arg_val,est_arg_val, rhs_value, est_rhs_value);
+                                    full_semantics_eval(rhs,mpf_mngr,rm,arg_val,est_arg_val, bv_args, rhs_value, est_rhs_value);
 
                                 if (mpf_mngr.eq(rhs_value, est_rhs_value)) {
                                     full_mdl->register_decl((to_app(lhs))->get_decl(), m_float_util.mk_value(est_rhs_value));
@@ -567,6 +611,7 @@ class fpa2bv_approx_tactic: public tactic {
                                     std::cout << mk_ismt2_pp(lhs, m) << " is imprecise because some children are imprecise." << std::endl;
                                     precise_op.insert(lhs, false);
                                 }
+
                             }
                         }
                     }
@@ -695,7 +740,7 @@ class fpa2bv_approx_tactic: public tactic {
         }
 
 
-        void rank_terms(obj_map<expr, double> & err_ratio_map, std::list <struct pair *> & ranked_terms)
+        void rank_terms(obj_map<expr, double> & err_ratio_map,obj_map<func_decl, unsigned> & cnst2prec_map, std::list <struct pair *> & ranked_terms)
         {
             unsigned kth = (unsigned)(err_ratio_map.size()*K_PERCENTAGE);
             if (kth<10) kth=K_MIN;
@@ -709,6 +754,9 @@ class fpa2bv_approx_tactic: public tactic {
             ranked_terms.push_front(p);
 
             for (it++; it != err_ratio_map.end(); it++) {
+                if (cnst2prec_map.contains(to_app(it->m_key)->get_decl()) &&
+                    cnst2prec_map.find(to_app(it->m_key)->get_decl()) == MAX_PRECISION)
+                    continue; //IGNORE those already at max precision
                 if (ranked_terms.size()<kth || it->m_value >= ranked_terms.back()->quotient) {
                     std::list<struct pair *>::iterator pos = ranked_terms.begin();
                     while (pos!=ranked_terms.end() && it->m_value <= ranked_terms.back()->quotient)
@@ -743,12 +791,16 @@ class fpa2bv_approx_tactic: public tactic {
                     itp++) {
                 app * cur = to_app((*itp)->exp);
                 func_decl * f = cur->get_decl();
-                unsigned new_prec = PREC_INCREMENT, old_prec;
+                unsigned new_prec = 0, old_prec;
                 bool in_new_map;
 
                 if (cnst2prec_map.contains(f))
                     new_prec += cnst2prec_map.find(f);
 
+                if (new_prec >= MAX_PRECISION)
+                    continue;
+
+                new_prec += PREC_INCREMENT;
                 new_prec= (new_prec > MAX_PRECISION) ? MAX_PRECISION : new_prec;
                 new_map.insert(f, new_prec);
 
@@ -789,13 +841,28 @@ class fpa2bv_approx_tactic: public tactic {
                 delete *itp;
             }
 
+            if (new_map.size() > 0) {
             //Complete precision map
             func_decl * f;
             for(unsigned j=0; j<cnsts.size();j++)
                 if(!new_map.contains((f=cnsts.get(j))))
                     new_map.insert(f, cnst2prec_map.find(f));
+            }
+            else { //No precision was increased then we increase all of them
+                func_decl * f;
+                unsigned prec = 0;
+                for(unsigned j=0; j<cnsts.size();j++){
+                    f = cnsts.get(j);
+                    prec = cnst2prec_map.find(f);
+                    prec += PREC_INCREMENT;
+                    prec = (prec > MAX_PRECISION) ? MAX_PRECISION : prec;
+                    new_map.insert(f, prec);
+                }
+            }
+
 
         }
+
 
         void model_guided_approximation_refinement(
                 model_ref const & mdl,
@@ -817,7 +884,7 @@ class fpa2bv_approx_tactic: public tactic {
                 proof_guided_refinement(g,cnsts,cnst2prec_map,new_map);
             }
             else {
-                rank_terms (err_ratio_map,ranked_terms);
+                rank_terms (err_ratio_map,cnst2prec_map,ranked_terms);
                 increase_precision(ranked_terms,cnsts,cnst2prec_map,cnst2term_map,new_map);
             }
         }

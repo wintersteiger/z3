@@ -100,6 +100,7 @@ struct const_intro_rewriter_cfg : public default_rewriter_cfg {
             case OP_FPA_FMA:
             case OP_FPA_SQRT:
             case OP_FPA_TO_FP:
+            case OP_FPA_TO_FP_UNSIGNED:
             case OP_FPA_ROUND_TO_INTEGRAL:
 				{					
 					app * f_app = m_manager.mk_app(f, num, args);
