@@ -292,46 +292,33 @@ class fpa2bv_approx_tactic: public tactic {
                 i = 1;
             }
 
-            if (m_float_util.is_to_fp(rhs)){
-                expr_ref res = expr_ref(m);
-
-
-//                ast_kind kinds[4];
-//                for (int j=0; j < 4; j++) {
-//                    if (j < rhs->get_num_args()) {
-//                        kinds[j] = rhs->get_arg()
-//                    }
-//                    else {
-//
-//                    }
-//
+//            if (m_float_util.is_to_fp(rhs)){
+//                expr_ref res = expr_ref(m);
+//                expr * args[4];
+//                for (unsigned j=0; j < rhs->get_num_args(); j++) {
+//                    expr * arg = rhs->get_arg(j);
+//                    mdl->eval(arg, arg_e[j],true);
+//                    args[j] = arg_e[j].get();
 //                }
-                expr * args[4];
-                for (unsigned j=0; j < rhs->get_num_args(); j++) {
-                    expr * arg = rhs->get_arg(i);
-                    mdl->eval(arg, arg_e[i],true);
-                    args[i] = arg_e[i].get();
-                }
-                m_fpa_rewriter.mk_to_fp(rhs->get_decl(),rhs->get_num_args(),args, res);
-
-
-            }
-            else {
+//                m_fpa_rewriter.mk_to_fp(rhs->get_decl(),rhs->get_num_args(),args, res);
+//
+//
+//            }
+//            else {
 
 
                 //Collect argument values
-                for (; i < rhs->get_num_args(); i++) {
-                    expr * arg = rhs->get_arg(i);
+            for (; i < rhs->get_num_args(); i++) {
+                expr * arg = rhs->get_arg(i);
 
-                    if ( m_float_util.is_to_fp_unsigned(rhs) ){
-                                   expr * arg = rhs->get_arg(i);
-                                   rational r;
-                                   unsigned int bv_size;
-                                   mdl->eval(arg, arg_e[i],true);
-                                   bool q = m_bv_util.is_numeral(arg_e[i], bv_arg_val[i], bv_size);
-                                   SASSERT(q);
-                    }
-                    else  {
+                if ( m_bv_util.is_bv(rhs) ){
+                   rational r;
+                   unsigned int bv_size;
+                   mdl->eval(arg, arg_e[i],true);
+                   bool q = m_bv_util.is_numeral(arg_e[i], bv_arg_val[i], bv_size);
+                   SASSERT(q);
+                }
+                else  {
 
                     if (is_app(arg) && to_app(arg)->get_num_args() == 0) {
                         if (precise_op.contains(arg)) {
@@ -373,9 +360,9 @@ class fpa2bv_approx_tactic: public tactic {
                     }
                     else
                         std::cout << "Estimated value missing: " << mk_ismt2_pp(arg,m) << std::endl;
-                    }
                 }
             }
+
         }
 
 
@@ -424,10 +411,32 @@ class fpa2bv_approx_tactic: public tactic {
                 break;
             case OP_FPA_TO_FP:
             {
-                unsigned ebits = rhs->get_decl()->get_parameter(0).get_int();
-                unsigned sbits = rhs->get_decl()->get_parameter(1).get_int();
-                mpf_mngr.set(rhs_value, ebits, sbits, rm, arg_val[1]);
-                mpf_mngr.set(est_rhs_value, ebits, sbits, rm, est_arg_val[1]);
+                expr_ref res = expr_ref(m);
+                expr_ref est_res = expr_ref(m);
+                expr * args[4];
+                expr * est_args[4];
+                for (unsigned j=0; j < rhs->get_num_args(); j++) {
+                    expr * arg = rhs->get_arg(j);
+                    if(m_float_util.is_rm(arg)){
+                        args[j] = arg;
+                        est_args[j] = arg;
+                    }
+                    else if(m_float_util.is_float(arg)){
+                        args[j] = m_float_util.mk_value(arg_val[j]);
+                        est_args[j] = m_float_util.mk_value(est_arg_val[j]);
+                    }
+                    else if (m_bv_util.is_bv(arg)){
+                        unsigned size = m_bv_util.get_bv_size(arg);
+                        args[j] = m_bv_util.mk_numeral(bv_arg_val[j],size);
+                        est_args[j] = args[j];
+                    }
+                    else
+                        NOT_IMPLEMENTED_YET();
+                }
+                m_fpa_rewriter.mk_to_fp(rhs->get_decl(),rhs->get_num_args(),args, res);
+                m_fpa_rewriter.mk_to_fp(rhs->get_decl(),rhs->get_num_args(),est_args, est_res);
+                m_float_util.is_numeral(res,rhs_value);
+                m_float_util.is_numeral(est_res,est_rhs_value);
                 break;
             }
             case OP_FPA_TO_FP_UNSIGNED:
@@ -588,18 +597,10 @@ class fpa2bv_approx_tactic: public tactic {
                             bool seen_all_children = true;
                             bool children_have_finite_err = true;
 
-//                            switch(rhs->get_decl_kind()){
-//
-//                            case OP_FPA_TO_FP:
-//                            case OP_FPA_TO_FP_UNSIGNED:
-//
-//                            case OP_FPA_TO_UBV:
-//                            case OP_FPA_TO_SBV:
-//
-//                            default:
-                                obtain_values(rhs, mdl, full_mdl,mpf_mngr,cnst2term_map,precise_op,actual_value,
+
+                            obtain_values(rhs, mdl, full_mdl,mpf_mngr,cnst2term_map,precise_op,actual_value,
                                     err_est, rm, precise_children, seen_all_children, children_have_finite_err, arg_val, est_arg_val, bv_arg_val);
-                            //}
+
 
                             if (seen_all_children) {//If some arguments are not evaluated yet, skip
                                 if (rhs->get_num_args() == 0)
