@@ -276,7 +276,9 @@ void fpa2bv_converter_prec::mk_ite(expr * c, expr * t, expr * f, expr_ref & resu
     fpa2bv_converter::mk_ite(c,nt,nf,result);
 }
 
-
+void fpa2bv_converter_prec::mk_distinct(func_decl * f, unsigned num, expr * const * args, expr_ref & result) {
+    fpa2bv_converter::mk_distinct(f, num, args, result);
+}
 
 void fpa2bv_converter_prec::mk_add(func_decl * f, unsigned prec, unsigned num, expr * const * args, expr_ref & result) {
     // AZ: Switch can be moved just before the call to the fix_bits method, everything else should be the same
@@ -870,7 +872,7 @@ void fpa2bv_converter_prec::mk_div(func_decl * f, unsigned prec, unsigned num, e
     }
 }
 
-void fpa2bv_converter_prec::mk_remainder(func_decl * f, unsigned prec, unsigned num, expr * const * args, expr_ref & result) {
+void fpa2bv_converter_prec::mk_rem(func_decl * f, unsigned prec, unsigned num, expr * const * args, expr_ref & result) {
     switch (m_mode) {
     case FPAA_SMALL_FLOATS:
         {
@@ -1045,7 +1047,7 @@ void fpa2bv_converter_prec::mk_max(func_decl * f, unsigned prec, unsigned num, e
     }
 }
 
-void fpa2bv_converter_prec::mk_fusedma(func_decl * f, unsigned prec, unsigned num, expr * const * args, expr_ref & result) {
+void fpa2bv_converter_prec::mk_fma(func_decl * f, unsigned prec, unsigned num, expr * const * args, expr_ref & result) {
     switch (m_mode) {
     case FPAA_SMALL_FLOATS:
         {
@@ -1487,11 +1489,12 @@ void fpa2bv_converter_prec::mk_float_lt(func_decl * f, unsigned num, expr * cons
         mk_small_op(f, ebits, sbits, num, args, small_fd, small_args);
         fpa2bv_converter::mk_float_lt(small_fd, num, small_args.c_ptr(), result);
         SASSERT(is_well_sorted(m, result));
-        TRACE("fpa2bv_small_float_add", tout << mk_ismt2_pp(result, m) << std::endl; );
+        TRACE("fpa2bv_small_float_lt", tout << mk_ismt2_pp(result, m) << std::endl; );
         break;
     }
     }
 }
+
 void fpa2bv_converter_prec::mk_float_gt(func_decl * f, unsigned num, expr * const * args, expr_ref & result)
 {
     switch (m_mode){
@@ -1508,11 +1511,12 @@ void fpa2bv_converter_prec::mk_float_gt(func_decl * f, unsigned num, expr * cons
         mk_small_op(f, ebits, sbits, num, args, small_fd, small_args);
         fpa2bv_converter::mk_float_gt(small_fd, num, small_args.c_ptr(), result);
         SASSERT(is_well_sorted(m, result));
-        TRACE("fpa2bv_small_float_add", tout << mk_ismt2_pp(result, m) << std::endl; );
+        TRACE("fpa2bv_small_float_gt", tout << mk_ismt2_pp(result, m) << std::endl; );
         break;
     }
     }
 }
+
 void fpa2bv_converter_prec::mk_float_le(func_decl * f, unsigned num, expr * const * args, expr_ref & result)
 {
     switch (m_mode){
@@ -1529,11 +1533,12 @@ void fpa2bv_converter_prec::mk_float_le(func_decl * f, unsigned num, expr * cons
         mk_small_op(f, ebits, sbits, num, args, small_fd, small_args);
         fpa2bv_converter::mk_float_le(small_fd, num, small_args.c_ptr(), result);
         SASSERT(is_well_sorted(m, result));
-        TRACE("fpa2bv_small_float_add", tout << mk_ismt2_pp(result, m) << std::endl; );
+        TRACE("fpa2bv_small_float_le", tout << mk_ismt2_pp(result, m) << std::endl; );
         break;
     }
     }
 }
+
 void fpa2bv_converter_prec::mk_float_ge(func_decl * f, unsigned num, expr * const * args, expr_ref & result)
 {
     switch (m_mode){
@@ -1550,7 +1555,7 @@ void fpa2bv_converter_prec::mk_float_ge(func_decl * f, unsigned num, expr * cons
         mk_small_op(f, ebits, sbits, num, args, small_fd, small_args);
         fpa2bv_converter::mk_float_ge(small_fd, num, small_args.c_ptr(), result);
         SASSERT(is_well_sorted(m, result));
-        TRACE("fpa2bv_small_float_add", tout << mk_ismt2_pp(result, m) << std::endl; );
+        TRACE("fpa2bv_small_float_ge", tout << mk_ismt2_pp(result, m) << std::endl; );
         break;
     }
     }

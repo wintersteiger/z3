@@ -16,8 +16,8 @@ Author:
 Notes:
 
 --*/
-#ifndef _FPA2BV_CONVERTER_PREC
-#define _FPA2BV_CONVERTER_PREC
+#ifndef _FPA2BV_CONVERTER_PREC_H_
+#define _FPA2BV_CONVERTER_PREC_H_
 
 #include"ast.h"
 #include"obj_hashtable.h"
@@ -58,18 +58,19 @@ public:
     void mk_const(func_decl * f, unsigned prec, expr_ref & result);
 
     void mk_eq(expr * a, expr * b, expr_ref & result);
-    void mk_ite(expr * c, expr * t, expr * f, expr_ref & result);    
+    void mk_ite(expr * c, expr * t, expr * f, expr_ref & result); 
+    void mk_distinct(func_decl * f, unsigned num, expr * const * args, expr_ref & result);
 
     void mk_add(func_decl * f, unsigned prec, unsigned num, expr * const * args, expr_ref & result);
     void mk_sub(func_decl * f, unsigned prec, unsigned num, expr * const * args, expr_ref & result);
     void mk_uminus(func_decl * f, unsigned prec, unsigned num, expr * const * args, expr_ref & result);
     void mk_mul(func_decl * f, unsigned prec, unsigned num, expr * const * args, expr_ref & result);
     void mk_div(func_decl * f, unsigned prec, unsigned num, expr * const * args, expr_ref & result);
-    void mk_remainder(func_decl * f, unsigned prec, unsigned num, expr * const * args, expr_ref & result);
+    void mk_rem(func_decl * f, unsigned prec, unsigned num, expr * const * args, expr_ref & result);
     void mk_abs(func_decl * f, unsigned prec, unsigned num, expr * const * args, expr_ref & result);
     void mk_min(func_decl * f, unsigned prec, unsigned num, expr * const * args, expr_ref & result);
     void mk_max(func_decl * f, unsigned prec, unsigned num, expr * const * args, expr_ref & result);
-    void mk_fusedma(func_decl * f, unsigned prec, unsigned num, expr * const * args, expr_ref & result);
+    void mk_fma(func_decl * f, unsigned prec, unsigned num, expr * const * args, expr_ref & result);
     void mk_sqrt(func_decl * f, unsigned prec, unsigned num, expr * const * args, expr_ref & result);
     void mk_round_to_integral(func_decl * f, unsigned prec, unsigned num, expr * const * args, expr_ref & result);
 
