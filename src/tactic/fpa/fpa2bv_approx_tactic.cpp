@@ -1344,7 +1344,7 @@ class fpa2bv_approx_tactic: public tactic {
             }
 #ifdef Z3DEBUG
             std::cout << "=============== Terminating " << std::endl;          
-            std::cout << "Iteration count: " << iteration_cnt << std::endl
+            std::cout << "Iteration count: " << iteration_cnt << std::endl;
 #endif
 	    dec_ref_map_key_values(m, const2term_map);
         }
