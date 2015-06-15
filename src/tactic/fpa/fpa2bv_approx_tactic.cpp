@@ -1,6 +1,7 @@
 /*++
  Copyright (c) 2012 Microsoft Corporation
 
+
  Module Name:
 
  fpa2bv_approx_tactic.cpp
@@ -16,6 +17,7 @@
  Notes:
 
  --*/
+
 #include"tactical.h"
 #include"cooperate.h"
 #include"ref_util.h"
@@ -277,37 +279,15 @@ class fpa2bv_approx_tactic: public tactic {
         ){
             expr_ref arg_e[] = { expr_ref(m), expr_ref(m), expr_ref(m), expr_ref(m) };
             unsigned i=0;
-            int e_bits;
-            int s_bits;
+
             //Set rounding mode
             if (rhs->get_num_args() > 0 && m_float_util.is_rm(rhs->get_arg(0))) {
                 expr_ref rm_val(m);
                 mdl->eval(rhs->get_arg(0), rm_val, true);
                 m_float_util.is_rm_numeral(rm_val, rm);
-                func_decl * f = rhs->get_decl();
-                if (f->get_num_parameters() >= 2) {
-                    e_bits = f->get_parameter(0).get_int();
-                    s_bits = f->get_parameter(1).get_int();
-                }
                 i = 1;
             }
-
-//            if (m_float_util.is_to_fp(rhs)){
-//                expr_ref res = expr_ref(m);
-//                expr * args[4];
-//                for (unsigned j=0; j < rhs->get_num_args(); j++) {
-//                    expr * arg = rhs->get_arg(j);
-//                    mdl->eval(arg, arg_e[j],true);
-//                    args[j] = arg_e[j].get();
-//                }
-//                m_fpa_rewriter.mk_to_fp(rhs->get_decl(),rhs->get_num_args(),args, res);
-//
-//
-//            }
-//            else {
-
-
-                //Collect argument values
+            //Collect argument values
             for (; i < rhs->get_num_args(); i++) {
                 expr * arg = rhs->get_arg(i);
 
@@ -358,8 +338,11 @@ class fpa2bv_approx_tactic: public tactic {
                         actual_value.insert(arg, tmp);
                         mpf_mngr.set(est_arg_val[i], *tmp);
                     }
+#ifdef Z3DEBUG
                     else
+
                         std::cout << "Estimated value missing: " << mk_ismt2_pp(arg,m) << std::endl;
+#endif
                 }
             }
 
@@ -551,8 +534,10 @@ class fpa2bv_approx_tactic: public tactic {
             for (unsigned j = 0; j < g->size(); j++) {
                 mdl->eval(g->form(j), res, true);
                 if (!m.is_true(res)) {
+#ifdef Z3DEBUG
                     std::cout << "Failed: " << mk_ismt2_pp(g->form(j), m) << std::endl;
                     std::cout << "Evaluates to: " << mk_ismt2_pp(res, m) << std::endl;
+#endif
                     is_model=false;
                 }
             }
@@ -589,7 +574,9 @@ class fpa2bv_approx_tactic: public tactic {
                         rhs = cnst2term_map.find(cnsts.get(i));
                         if (precise_op.contains(lhs))//already visited, skip
                                 return;
+#ifdef Z3DEBUG
                         std::cout << "Evaluating: " << mk_ismt2_pp(rhs,m) << std::endl;
+#endif
                         mdl->eval(lhs, lhs_eval, true);
 
                         if (m_float_util.is_numeral(lhs_eval, lhs_value)) {//OLD:is_value
@@ -634,7 +621,9 @@ class fpa2bv_approx_tactic: public tactic {
                                 }
 
                                 if (!precise_children && !precise_op.contains(lhs)) {
-                                    std::cout << mk_ismt2_pp(lhs, m) << " is imprecise because some children are imprecise." << std::endl;
+#ifdef Z3DEBUG                                   
+				  std::cout << mk_ismt2_pp(lhs, m) << " is imprecise because some children are imprecise." << std::endl;
+#endif 
                                     precise_op.insert(lhs, false);
                                 }
 
@@ -856,14 +845,17 @@ class fpa2bv_approx_tactic: public tactic {
                                 new_map.remove(arg_decl);
                             SASSERT(new_prec <= MAX_PRECISION);
                             new_map.insert(arg_decl, new_prec);
-                            std::cout << "    " << arg_decl->get_name() << ":" << new_prec << std::endl;
 #ifdef Z3DEBUG
+                            std::cout << "    " << arg_decl->get_name() << ":" << new_prec << std::endl;
+
                             std::cout<<"    "<<mk_ismt2_pp(cur->get_arg(i),m)<<":"<<new_prec<<std::endl;
 #endif
                         }
                     }
                 }
+#ifdef Z3DEBUG
                 std::cout.flush();
+#endif
                 delete *itp;
             }
 
@@ -971,7 +963,9 @@ class fpa2bv_approx_tactic: public tactic {
             // CMW: This is all done using the temporary manager!
             expr_ref new_curr(*m_temp_manager);
             proof_ref new_pr(*m_temp_manager);
+#ifdef Z3DEBUG
             std::cout.flush();
+#endif
 
             SASSERT(g->is_well_sorted());
 
@@ -1132,9 +1126,10 @@ class fpa2bv_approx_tactic: public tactic {
                 bit_blaster_rewriter bv2bool(*m_temp_manager, m_params);
                 bitblast(ng, fpa2bv, bv2bool, const2prec_map_tm, sat_solver, atom_map);
                 { tactic_report report_i("fpa2bv_approx_after_bitblaster", *ng); }
-
+#ifdef Z3DEBUG
                 std::cout << "Iteration variables: " << sat_solver.num_vars() << std::endl;
                 std::cout << "Iteration clauses: " << sat_solver.num_clauses() << std::endl;
+#endif
                 r = sat_solver.check();
 
                 if (r == l_true)
@@ -1202,12 +1197,14 @@ class fpa2bv_approx_tactic: public tactic {
             for (unsigned j = 0; j < g->size(); j++) {
                 full_mdl->eval(g->form(j), res, true);
                 if (!m.is_true(res)) {
+#ifdef Z3DEBUG
                     std::cout << "Failed: " << mk_ismt2_pp(g->form(j), m) << std::endl;
                     std::cout << "Evaluates to: " << mk_ismt2_pp(res, m) << std::endl;
+#endif
                 }
                 SASSERT(m.is_true(res));
             }
-
+#ifdef Z3DEBUG
             std::cout << "Full model: " << std::endl;
             for (unsigned i = 0 ; i < full_mdl->get_num_decls(); i++)
             {
@@ -1216,7 +1213,7 @@ class fpa2bv_approx_tactic: public tactic {
                     std::cout << d->get_name() << " = " << mk_ismt2_pp(full_mdl->get_const_interp(d), m) << std::endl;
             }
             std::cout.flush();
-
+#endif
             result.back()->reset();
 
             // Filter all the constants we introduced earlier from the model.
@@ -1277,14 +1274,15 @@ class fpa2bv_approx_tactic: public tactic {
             lift(g, constants, &const2term_map);
 
             init_precision_mapping(constants, const2prec_map, const2term_map);
-
+#ifdef Z3DEBUG
             std::cout << "Simplified goal:" << std::endl;
             g->display(std::cout);
-
+#endif
             while (!solved && !m_cancel)
             {
+#ifdef Z3DEBUG
                 std::cout << "=============== Starting iteration " << ++iteration_cnt << std::endl;
-
+#endif
                 sw.reset();
                 sw.start();
 
@@ -1298,9 +1296,9 @@ class fpa2bv_approx_tactic: public tactic {
                 TRACE("fpa2bv_approx_goal_i", mg->display(tout); );
 
                 r = approximate_model_construction(mg, const2prec_map);
-
+#ifdef Z3DEBUG
                 std::cout << "Approximation is " << (r==l_true?"SAT":r==l_false?"UNSAT":"UNKNOWN") << std::endl;
-
+#endif
                 if (r == l_true) {
                     model_ref full_mdl = alloc(model, m);
                     obj_map<expr, double> err_est;
@@ -1308,14 +1306,17 @@ class fpa2bv_approx_tactic: public tactic {
                     if (fully_encoded(const2prec_map)) {
                         full_mdl = m_fpa_model;
                         solved = true;
+#ifdef Z3DEBUG
                         std::cout<<"Model is at full precision, no patching needed!"<<std::endl;
-                        std::cout.flush();
+			std::cout.flush();
+#endif
                     }
                     else {
                         solved = precise_model_reconstruction(m_fpa_model, full_mdl, mg, err_est, constants, const2term_map);
-
+#ifdef Z3DEBUG
                         std::cout<<"Patching of the model "<<((solved)?"succeeded":"failed")<<std::endl;
                         std::cout.flush();
+#endif
                     }
                     if (!solved)
                         model_guided_approximation_refinement(m_fpa_model, full_mdl, mg, constants, const2prec_map, const2term_map, err_est, next_const2prec_map);
@@ -1337,12 +1338,15 @@ class fpa2bv_approx_tactic: public tactic {
 
                 const2prec_map.swap(next_const2prec_map);
                 next_const2prec_map.reset();
+#ifdef Z3DEBUG
                 std::cout << "Iteration time: " << sw.get_current_seconds() << std::endl;
+#endif
             }
-
-            std::cout << "=============== Terminating " << std::endl;
-            dec_ref_map_key_values(m, const2term_map);
-            std::cout << "Iteration count: " << iteration_cnt << std::endl;
+#ifdef Z3DEBUG
+            std::cout << "=============== Terminating " << std::endl;          
+            std::cout << "Iteration count: " << iteration_cnt << std::endl
+#endif
+	    dec_ref_map_key_values(m, const2term_map);
         }
     };
 
