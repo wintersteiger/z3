@@ -491,10 +491,11 @@ class fpa2bv_approx_tactic: public tactic {
                 obj_map<expr, double> & err_est,
                 mpf & lhs_value,
                 mpf & est_rhs_value,
-                bool children_have_finite_err){
+                bool children_have_finite_err)
+        {
             mpf err, rel_err;
             if (!mpf_mngr.eq(lhs_value, est_rhs_value) &&
-                    !(mpf_mngr.is_nan(lhs_value) && mpf_mngr.is_nan(est_rhs_value))) {
+                !(mpf_mngr.is_nan(lhs_value) && mpf_mngr.is_nan(est_rhs_value))) {
 #ifdef Z3DEBUG
                 std::cout << "Increasing precision of " << mk_ismt2_pp(lhs, m) <<
                         " because " << mk_ismt2_pp(lhs, m) << " != " <<
@@ -502,7 +503,7 @@ class fpa2bv_approx_tactic: public tactic {
 #endif
                 //TODO: smarter adjustment to be implemented
                 precise_op.insert(lhs, false);
-                if (mpf_mngr.is_regular(lhs_value) && mpf_mngr.is_regular(est_rhs_value)) {
+                if (mpf_mngr.is_regular(lhs_value)  && mpf_mngr.is_regular(est_rhs_value)) {
                     mpf_mngr.sub(MPF_ROUND_TOWARD_ZERO, est_rhs_value, lhs_value, err);
                     mpf_mngr.div(MPF_ROUND_TOWARD_ZERO, err, lhs_value, rel_err);
                     mpf_mngr.abs(rel_err);
@@ -678,8 +679,9 @@ class fpa2bv_approx_tactic: public tactic {
 
             //Completing the model with values for input variables
             for (unsigned j=0; j < mdl->get_num_constants(); j++) {
-                if (!cnst2term_map.contains(mdl->get_constant(j))
-                        && !full_mdl->get_const_interp(mdl->get_constant(j))) {
+                if (!cnst2term_map.contains(mdl->get_constant(j)) &&
+                    !full_mdl->get_const_interp(mdl->get_constant(j)))
+                {
                     mdl->eval(mdl->get_constant(j), res);
                     full_mdl->register_decl(mdl->get_constant(j), res);
                 }
