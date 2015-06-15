@@ -190,7 +190,7 @@ void mpf_manager::set(mpf & o, unsigned ebits, unsigned sbits, float value) {
 
 void mpf_manager::set(mpf & o, unsigned ebits, unsigned sbits, mpf_rounding_mode rm, mpq const & value) {
     TRACE("mpf_dbg", tout << "set: " << m_mpq_manager.to_string(value) << " [" << ebits << "/" << sbits << "]"<< std::endl;);
-	scoped_mpz exp(m_mpz_manager);
+    scoped_mpz exp(m_mpz_manager);
     m_mpz_manager.set(exp, 0);
     set(o, ebits, sbits, rm, value, exp);
     TRACE("mpf_dbg", tout << "set: res = " << to_string(o) << std::endl;);
