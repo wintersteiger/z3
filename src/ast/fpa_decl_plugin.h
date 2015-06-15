@@ -193,6 +193,7 @@ public:
     app * mk_numeral(mpf const & v);
     bool is_numeral(expr * n);
     bool is_numeral(expr * n, mpf & val);
+    bool is_numeral(expr * n, unsigned e_bits, unsigned s_bits, mpf_rounding_mode rm, mpf & val);
     bool is_rm_numeral(expr * n, mpf_rounding_mode & val);
     bool is_rm_numeral(expr * n);
 
@@ -248,6 +249,11 @@ public:
     app * mk_value(mpf const & v) { return m_plugin->mk_numeral(v); }
     bool is_numeral(expr * n) { return m_plugin->is_numeral(n); }
     bool is_numeral(expr * n, mpf & v) { return m_plugin->is_numeral(n, v); }
+    bool is_sorted_numeral(expr * n,mpf_rounding_mode rm, mpf & v) {
+        sort * s = to_app(n)->get_decl()->get_range();
+        return m_plugin->is_numeral(n, get_ebits(s),get_sbits(s),rm, v);
+    }
+
     bool is_rm_numeral(expr * n) { return m_plugin->is_rm_numeral(n); }
     bool is_rm_numeral(expr * n, mpf_rounding_mode & v) { return m_plugin->is_rm_numeral(n, v); }
 

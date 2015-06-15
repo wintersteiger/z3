@@ -260,7 +260,9 @@ class fpa2bv_approx_tactic: public tactic {
             }
         }
 
+
         void obtain_values(
+                app * lhs,
                 app * rhs,
                 model_ref const & mdl,
                 model_ref & full_mdl,
@@ -322,6 +324,8 @@ class fpa2bv_approx_tactic: public tactic {
                     // Value from small model
                     mdl->eval(arg, arg_e[i],true);
                     m_float_util.is_numeral(arg_e[i], arg_val[i]);
+                    //std::cout << "Retrieving small value: " << mk_ismt2_pp(arg,m)<<":"<<mk_ismt2_pp(arg_e[i],m) << std::endl;
+                    //m_float_util.is_sorted_numeral(arg_e[i], rm, arg_val[i]);
 
                     if( children_have_finite_err &&
                             err_est.contains(arg) &&
@@ -333,10 +337,32 @@ class fpa2bv_approx_tactic: public tactic {
                     else if (seen_all_children && is_app(arg) && to_app(arg)->get_num_args()==0) {
                         //We have seen all children so if it is a constant and not in actual_value then
                         //it is an input variable and its est_val is the same as actual value
+
+////                        expr * argument_e[2] = {m_float_util.mk_round_toward_zero(),arg_e[i].get()};
+//                        expr_ref cast_up_arg(m);
+//                        sort * ds = to_app(lhs)->get_decl()->get_range();
+//                        app * cast_up = m_float_util.mk_to_fp(ds,argument_e[0],arg_e[i]);
+//                        bool q = m_fpa_rewriter.mk_to_fp(cast_up->get_decl(),2u,argument_e,cast_up_arg);
+//                        SASSERT(q);
+//                        m_float_util.is_numeral(cast_up_arg,*tmp);
+
+//                        m_float_util.is_numeral(cast_up,tmp);
+//                        //mpf_mngr.set(tmp,e_b,s_b,rm,est_rhs_value);
+//                        if (cnst2term_map.contains(to_app(arg)->get_decl())){
+//                            sort * orig_sort = cnst2term_map.find(to_app(arg)->get_decl())->get_decl()->get_domain(0);
+//                        sort * ds = to_app(lhs)->get_decl()->get_range();
+//                        unsigned e_bits = m_float_util.get_ebits(ds);
+//                        unsigned s_bits = m_float_util.get_sbits(ds);
+                        //mpf_mngr.set(*tmp, e_bits,s_bits,rm, arg_val[i]);
                         mpf * tmp = alloc(mpf);
                         mpf_mngr.set(*tmp, arg_val[i]);
                         actual_value.insert(arg, tmp);
                         mpf_mngr.set(est_arg_val[i], *tmp);
+
+//                            mpf_mngr.set(*tmp, arg_val[i]);
+//                            actual_value.insert(arg, tmp);
+//                            mpf_mngr.set(est_arg_val[i], *tmp);
+
                     }
 #ifdef Z3DEBUG
                     else
@@ -586,7 +612,7 @@ class fpa2bv_approx_tactic: public tactic {
                             bool children_have_finite_err = true;
 
 
-                            obtain_values(rhs, mdl, full_mdl, cnst2term_map, precise_op, actual_value,
+                            obtain_values(to_app(lhs),rhs, mdl, full_mdl, cnst2term_map, precise_op, actual_value,
                                           err_est, rm, precise_children, seen_all_children, children_have_finite_err, 
                                           arg_val, est_arg_val, bv_arg_val);
 
@@ -602,6 +628,7 @@ class fpa2bv_approx_tactic: public tactic {
                                     precise_op.insert(lhs, true);
                                 }
                                 else {
+
                                     full_mdl->register_decl((to_app(lhs))->get_decl(), m_float_util.mk_value(est_rhs_value));
 #ifdef Z3DEBUG
                                     std::cout << "Assigning " << mk_ismt2_pp(lhs, m) <<
