@@ -30,7 +30,7 @@
 #include"sat_solver.h"
 #include"fpa_decl_plugin.h"
 #include"fpa2bv_converter_prec.h"
-#include"fpa2bv_model_converter.h"
+#include"fpa2bv_model_converter_prec.h"
 #include"fpa2bv_converter.h"
 #include"propagate_values_tactic.h"
 #include"fpa2bv_rewriter_prec.h"
@@ -81,6 +81,7 @@ class fpa2bv_approx_tactic: public tactic {
         model_ref m_fpa_model;
         fpa_util m_float_util;
         bv_util m_bv_util;
+        arith_util m_arith_util;
         fpa_rewriter m_fpa_rewriter;
 
         imp(ast_manager & _m, params_ref const & p, fpa_approximation_mode mode) :
@@ -94,7 +95,8 @@ class fpa2bv_approx_tactic: public tactic {
             m_temp_manager(0),
             m_float_util(_m),
             m_bv_util(_m),
-            m_fpa_rewriter(_m){
+            m_arith_util(_m),
+            m_fpa_rewriter(_m) {
         }
 
         void updt_params(params_ref const & p) {
@@ -210,6 +212,7 @@ class fpa2bv_approx_tactic: public tactic {
             std::cout.flush();
 #endif
         }
+
         //Equality as assignment?
         void fix_cnst2cnst_equalities(goal_ref const & g,model_ref & full_mdl) {
             app * eq;
@@ -261,114 +264,120 @@ class fpa2bv_approx_tactic: public tactic {
         }
 
 
-        void obtain_values(
-                app * lhs,
-                app * rhs,
-                model_ref const & mdl,
-                model_ref & full_mdl,
-                obj_map<func_decl,app*> & cnst2term_map,
-                obj_map<expr, bool> & precise_op,
-                obj_map<expr, mpf*> & actual_value,
-                obj_map<expr, double> & err_est,
-                mpf_rounding_mode & rm,
-                bool & precise_children,
-                bool & seen_all_children,
-                bool & children_have_finite_err,
-                mpf * arg_val,
-                mpf * est_arg_val,
-                rational * bv_arg_val
-        ){
+        void obtain_values(app * lhs,
+                           app * rhs,
+                           model_ref const & smallfloat_model,
+                           model_ref & full_mdl,
+                           obj_map<func_decl,app*> & cnst2term_map,
+                           obj_map<expr, bool> & precise_op,
+                           obj_map<expr, mpf*> & actual_value,
+                           obj_map<expr, double> & err_est,
+                           mpf_rounding_mode & rm,
+                           bool & precise_children,
+                           bool & seen_all_children,
+                           bool & children_have_finite_err,
+                           mpf * arg_val,
+                           mpf * est_arg_val,
+                           rational * bv_arg_val)
+        {
             mpf_manager & mpf_mngr = m_float_util.fm(); 
             expr_ref arg_e[] = { expr_ref(m), expr_ref(m), expr_ref(m), expr_ref(m) };
-            unsigned i=0;
 
-            //Set rounding mode
-            if (rhs->get_num_args() > 0 && m_float_util.is_rm(rhs->get_arg(0))) {
-                expr_ref rm_val(m);
-                mdl->eval(rhs->get_arg(0), rm_val, true);
-                m_float_util.is_rm_numeral(rm_val, rm);
-                i = 1;
-            }
-            //Collect argument values
-            for (; i < rhs->get_num_args(); i++) {
+            // Collect argument values
+            for (unsigned i = 0; i < rhs->get_num_args(); i++) {
                 expr * arg = rhs->get_arg(i);
 
-                if ( m_bv_util.is_bv(rhs) ){
-                   rational r;
-                   unsigned int bv_size;
-                   mdl->eval(arg, arg_e[i],true);
-                   bool q = m_bv_util.is_numeral(arg_e[i], bv_arg_val[i], bv_size);
-                   SASSERT(q);
+                if (m_bv_util.is_bv(arg)) {
+                    rational r;
+                    unsigned int bv_size;
+                    smallfloat_model->eval(arg, arg_e[i], true);
+                    bool q = m_bv_util.is_numeral(arg_e[i], bv_arg_val[i], bv_size);
+                    SASSERT(q);
                 }
-                else  {
-
+                else if (m_arith_util.is_int(arg) ||
+                         m_arith_util.is_real(arg)) {
+                    NOT_IMPLEMENTED_YET();
+                }
+                else if (m_float_util.is_rm(arg)) {
+                    expr_ref rm_val(m);
+                    smallfloat_model->eval(arg, rm_val, true);
+                    bool c = m_float_util.is_rm_numeral(rm_val, rm);
+                    SASSERT(c);
+                }
+                else if (m_float_util.is_float(arg)) {
                     if (is_app(arg) && to_app(arg)->get_num_args() == 0) {
-                        if (precise_op.contains(arg)) {
+
+                        if (precise_op.contains(arg))
                             precise_children &= precise_op.find(arg);
-                        }
-                        else if (!cnst2term_map.contains(to_app(arg)->get_decl())) {
-                            /* that's okay */
-                        }
+                        else if (!cnst2term_map.contains(to_app(arg)->get_decl()))
+                            /* that's okay */ ;
                         else {
-        #ifdef Z3DEBUG
+#ifdef Z3DEBUG
                             std::cout << "Not seen all children of " << mk_ismt2_pp(rhs, m) <<
-                                    " (spec. " << mk_ismt2_pp(arg, m) << ")" << std::endl;
-        #endif
+                                " (spec. " << mk_ismt2_pp(arg, m) << ")" << std::endl;
+#endif
                             precise_children = false;
                             seen_all_children = false;
                             break;
                         }
                     }
 
-
                     // Value from small model
-                    mdl->eval(arg, arg_e[i],true);
-                    m_float_util.is_numeral(arg_e[i], arg_val[i]);
-                    //std::cout << "Retrieving small value: " << mk_ismt2_pp(arg,m)<<":"<<mk_ismt2_pp(arg_e[i],m) << std::endl;
-                    //m_float_util.is_sorted_numeral(arg_e[i], rm, arg_val[i]);
+                    smallfloat_model->eval(arg, arg_e[i], true);
+                    bool c = m_float_util.is_numeral(arg_e[i], arg_val[i]);
+                    SASSERT(c);
+#ifdef Z3DEBUG
+                    std::cout << "Small-float model value for " << mk_ismt2_pp(arg, m) << " is " << std::endl <<
+                        mk_ismt2_pp(arg_e[i], m) << " == " << 
+                        mpf_mngr.to_string(arg_val[i]) << std::endl;
+                    std::cout << "Types are:" << std::endl <<
+                        mk_ismt2_pp(to_app(arg)->get_decl(), m) << " and" << std::endl <<
+                        mk_ismt2_pp(to_app(arg_e[i])->get_decl(), m) << std::endl;
+#endif
 
-                    if( children_have_finite_err &&
-                            err_est.contains(arg) &&
-                            isinfinite(err_est.find(arg)))
-                        children_have_finite_err=false;
+                    if (children_have_finite_err &&
+                        err_est.contains(arg) &&
+                        isinfinite(err_est.find(arg)))
+                        children_have_finite_err = false;
 
                     if (actual_value.contains(arg))
                         mpf_mngr.set(est_arg_val[i], *actual_value.find(arg));
-                    else if (seen_all_children && is_app(arg) && to_app(arg)->get_num_args()==0) {
+                    else if (seen_all_children && is_app(arg) && to_app(arg)->get_num_args() == 0) {
                         //We have seen all children so if it is a constant and not in actual_value then
                         //it is an input variable and its est_val is the same as actual value
 
-////                        expr * argument_e[2] = {m_float_util.mk_round_toward_zero(),arg_e[i].get()};
-//                        expr_ref cast_up_arg(m);
-//                        sort * ds = to_app(lhs)->get_decl()->get_range();
-//                        app * cast_up = m_float_util.mk_to_fp(ds,argument_e[0],arg_e[i]);
-//                        bool q = m_fpa_rewriter.mk_to_fp(cast_up->get_decl(),2u,argument_e,cast_up_arg);
-//                        SASSERT(q);
-//                        m_float_util.is_numeral(cast_up_arg,*tmp);
+                        ////                        expr * argument_e[2] = {m_float_util.mk_round_toward_zero(),arg_e[i].get()};
+                        //                        expr_ref cast_up_arg(m);
+                        //                        sort * ds = to_app(lhs)->get_decl()->get_range();
+                        //                        app * cast_up = m_float_util.mk_to_fp(ds,argument_e[0],arg_e[i]);
+                        //                        bool q = m_fpa_rewriter.mk_to_fp(cast_up->get_decl(),2u,argument_e,cast_up_arg);
+                        //                        SASSERT(q);
+                        //                        m_float_util.is_numeral(cast_up_arg,*tmp);
 
-//                        m_float_util.is_numeral(cast_up,tmp);
-//                        //mpf_mngr.set(tmp,e_b,s_b,rm,est_rhs_value);
-//                        if (cnst2term_map.contains(to_app(arg)->get_decl())){
-//                            sort * orig_sort = cnst2term_map.find(to_app(arg)->get_decl())->get_decl()->get_domain(0);
-//                        sort * ds = to_app(lhs)->get_decl()->get_range();
-//                        unsigned e_bits = m_float_util.get_ebits(ds);
-//                        unsigned s_bits = m_float_util.get_sbits(ds);
+                        //                        m_float_util.is_numeral(cast_up,tmp);
+                        //                        //mpf_mngr.set(tmp,e_b,s_b,rm,est_rhs_value);
+                        //                        if (cnst2term_map.contains(to_app(arg)->get_decl())){
+                        //                            sort * orig_sort = cnst2term_map.find(to_app(arg)->get_decl())->get_decl()->get_domain(0);
+                        //                        sort * ds = to_app(lhs)->get_decl()->get_range();
+                        //                        unsigned e_bits = m_float_util.get_ebits(ds);
+                        //                        unsigned s_bits = m_float_util.get_sbits(ds);
                         //mpf_mngr.set(*tmp, e_bits,s_bits,rm, arg_val[i]);
                         mpf * tmp = alloc(mpf);
                         mpf_mngr.set(*tmp, arg_val[i]);
                         actual_value.insert(arg, tmp);
                         mpf_mngr.set(est_arg_val[i], *tmp);
 
-//                            mpf_mngr.set(*tmp, arg_val[i]);
-//                            actual_value.insert(arg, tmp);
-//                            mpf_mngr.set(est_arg_val[i], *tmp);
-
+                        //                            mpf_mngr.set(*tmp, arg_val[i]);
+                        //                            actual_value.insert(arg, tmp);
+                        //                            mpf_mngr.set(est_arg_val[i], *tmp);
                     }
-#ifdef Z3DEBUG
-                    else
-
-                        std::cout << "Estimated value missing: " << mk_ismt2_pp(arg,m) << std::endl;
-#endif
+                }
+                else
+                {   
+                    #ifdef Z3DEBUG
+                    std::cout << "Estimated value missing: " << mk_ismt2_pp(arg, m) << std::endl;
+                    NOT_IMPLEMENTED_YET();
+                    #endif
                 }
             }
 
@@ -494,12 +503,12 @@ class fpa2bv_approx_tactic: public tactic {
                 model_ref const & mdl,
                 obj_map<expr, mpf*> & actual_value,
                 mpf & rhs_value,
-                mpf & est_rhs_value){
+                mpf & est_rhs_value) {
 
             mpf_manager & mpf_mngr = m_float_util.fm();
             expr_ref exp(m);
             mdl->eval(rhs, exp, true);
-            m_float_util.is_numeral(exp, rhs_value); //OLD:is_value
+            m_float_util.is_numeral(exp, rhs_value);
 
             if (actual_value.contains(rhs))
                 mpf_mngr.set(est_rhs_value, *actual_value.find(rhs));
@@ -511,13 +520,12 @@ class fpa2bv_approx_tactic: public tactic {
             }
         }
 
-        void calculate_error(
-                expr_ref & lhs,
-                obj_map<expr, bool> & precise_op,
-                obj_map<expr, double> & err_est,
-                mpf & lhs_value,
-                mpf & est_rhs_value,
-                bool children_have_finite_err)
+        void calculate_error(app_ref lhs,
+                             obj_map<expr, bool> & precise_op,
+                             obj_map<expr, double> & err_est,
+                             mpf & lhs_value,
+                             mpf & est_rhs_value,
+                             bool children_have_finite_err)
         {
             mpf_manager & mpf_mngr = m_float_util.fm();
             mpf err, rel_err;
@@ -575,15 +583,15 @@ class fpa2bv_approx_tactic: public tactic {
 
         void evaluate_and_patch(
                 func_decl_ref_vector const & cnsts,
-                model_ref const & mdl,
+                model_ref const & smallfloat_mdl,
                 model_ref & full_mdl,
                 goal_ref const & g,
                 obj_map<func_decl,app*> & cnst2term_map,
                 obj_map<expr, double> & err_est) {
 
             mpf_manager & mpf_mngr = m_float_util.fm();
-            expr_ref lhs(m), lhs_eval(m);
-            app * rhs;
+            app_ref lhs(m), rhs(m);
+            expr_ref lhs_eval(m);            
             mpf arg_val[4]; //First argument can be rounding mode
             mpf est_arg_val[4];
             rational bv_arg_val[4];
@@ -604,7 +612,7 @@ class fpa2bv_approx_tactic: public tactic {
 #ifdef Z3DEBUG
                         std::cout << "Evaluating: " << lhs << " == " << mk_ismt2_pp(rhs, m) << std::endl;
 #endif
-                        mdl->eval(lhs, lhs_eval, true);
+                        smallfloat_mdl->eval(lhs, lhs_eval, true);
 
                         if (m_float_util.is_numeral(lhs_eval, lhs_value)) {//OLD:is_value
                             bool precise_children = true;
@@ -612,14 +620,14 @@ class fpa2bv_approx_tactic: public tactic {
                             bool children_have_finite_err = true;
 
 
-                            obtain_values(to_app(lhs),rhs, mdl, full_mdl, cnst2term_map, precise_op, actual_value,
+                            obtain_values(lhs, rhs, smallfloat_mdl, full_mdl, cnst2term_map, precise_op, actual_value,
                                           err_est, rm, precise_children, seen_all_children, children_have_finite_err, 
                                           arg_val, est_arg_val, bv_arg_val);
 
 
                             if (seen_all_children) { //If some arguments are not evaluated yet, skip
                                 if (rhs->get_num_args() == 0)
-                                    evaluate_constant(rhs, mdl, actual_value, rhs_value, est_rhs_value);
+                                    evaluate_constant(rhs, smallfloat_mdl, actual_value, rhs_value, est_rhs_value);
                                 else
                                     full_semantics_eval(rhs, rm, arg_val, est_arg_val, bv_arg_val, rhs_value, est_rhs_value);
 
@@ -713,7 +721,9 @@ class fpa2bv_approx_tactic: public tactic {
                     !full_mdl->get_const_interp(mdl->get_constant(j)))
                 {
                     mdl->eval(mdl->get_constant(j), res);
+#ifdef Z3DEBUG
                     std::cout << " " << mdl->get_constant(j)->get_name() << " := " << mk_ismt2_pp(res, m) << std::endl;
+#endif
                     full_mdl->register_decl(mdl->get_constant(j), res);
                 }
             }
@@ -987,38 +997,32 @@ class fpa2bv_approx_tactic: public tactic {
         }
 
         void bitblast(goal_ref const & g,
-                fpa2bv_converter_prec & fpa2bv,
-                bit_blaster_rewriter & bv2bool,
-                obj_map<func_decl,unsigned> & const2prec_map,
-                sat::solver & solver,
-                atom2bool_var & map)
+                      fpa2bv_converter_prec & fpa2bv,
+                      bit_blaster_rewriter & bv2bool,
+                      obj_map<func_decl,unsigned> & const2prec_map,
+                      sat::solver & solver,
+                      atom2bool_var & map)
         {
             // CMW: This is all done using the temporary manager!
             expr_ref new_curr(*m_temp_manager);
             proof_ref new_pr(*m_temp_manager);
-#ifdef Z3DEBUG
-            std::cout.flush();
-#endif
-
             SASSERT(g->is_well_sorted());
 
             simplify(g);
 
-            //fpa2bv
-            fpa2bv_rewriter_prec fpa2bv_rw(*m_temp_manager, fpa2bv, m_params);
-            fpa2bv_rw.m_cfg.set_mappings(&const2prec_map);
+            fpa2bv_rewriter_prec fpa2bv_p_rw(*m_temp_manager, fpa2bv, m_params);
+            fpa2bv_p_rw.m_cfg.set_mappings(&const2prec_map);
             m_num_steps = 0;
             unsigned size = g->size();
             for (unsigned idx = 0; idx < size; idx++) {
                 if (g->inconsistent())
                     break;
                 expr * curr = g->form(idx);
+                fpa2bv_p_rw(curr, new_curr, new_pr);
 #ifdef Z3DEBUG
-                std::cout<<mk_ismt2_pp(curr,m)<<std::endl;
-                std::cout.flush();
+                std::cout << mk_ismt2_pp(curr, m) << std::endl;
 #endif
-                fpa2bv_rw(curr, new_curr, new_pr);
-                m_num_steps += fpa2bv_rw.get_num_steps();
+                m_num_steps += fpa2bv_p_rw.get_num_steps();
                 if (m_proofs_enabled) {
                     proof * pr = g->pr(idx);
                     new_pr = m_temp_manager->mk_modus_ponens(pr, new_pr);
@@ -1078,10 +1082,10 @@ class fpa2bv_approx_tactic: public tactic {
         }
 
         model_ref get_fpa_model(goal_ref const & g,
-                fpa2bv_converter_prec & fpa2bv,
-                bit_blaster_rewriter & bv2bool,
-                sat::solver & solver,
-                atom2bool_var & map) {
+                                fpa2bv_converter_prec & fpa2bv,
+                                bit_blaster_rewriter & bv2bool,
+                                sat::solver & solver,
+                                atom2bool_var & map) {
             // CMW: This is all done using the temporary manager, until at the very end we translate the model back to this->m.
             model_ref md = alloc(model, *m_temp_manager);
             sat::model const & ll_m = solver.get_model();
@@ -1105,16 +1109,25 @@ class fpa2bv_approx_tactic: public tactic {
 
             TRACE("sat_tactic", model_v2_pp(tout, *md););
             model_converter_ref bb_mc = mk_bit_blaster_model_converter(*m_temp_manager, bv2bool.const2bits());
-
-            model_converter_ref bv_mc = mk_fpa2bv_model_converter(*m_temp_manager, fpa2bv.const2bv(), fpa2bv.rm_const2bv(), fpa2bv.uf2bvuf(), fpa2bv.uf23bvuf());
+            model_converter_ref bv_mc = mk_fpa2bv_model_converter_prec(*m_temp_manager, fpa2bv.const2bv(), fpa2bv.rm_const2bv(), fpa2bv.uf2bvuf(), fpa2bv.uf23bvuf());
             bb_mc->operator()(md, 0);
             bv_mc->operator()(md, 0);
 
 #ifdef Z3DEBUG
             std::cout << "Model: " << std::endl;
             for (unsigned i = 0 ; i < md->get_num_constants(); i++) {
-                func_decl * d = md->get_constant(i);
-                std::cout << d->get_name() << " = " << mk_ismt2_pp(md->get_const_interp(d), *m_temp_manager) << std::endl;
+                expr_ref mv(*m_temp_manager);
+                func_decl * d = md->get_constant(i);                
+                mv = md->get_const_interp(d);
+                std::cout << d->get_name() << " = " << mk_ismt2_pp(mv, *m_temp_manager);
+                family_id fid = m_temp_manager->get_family_id("fpa");
+                fpa_decl_plugin * p = (fpa_decl_plugin*) m_temp_manager->get_plugin(fid);
+                mpf_manager & mm = p->fm();
+                scoped_mpf mmv(mm);
+                fpa_util fu(*m_temp_manager);
+                if (fu.is_numeral(mv, mmv))
+                    std::cout << " = " << mm.to_string(mmv);
+                std::cout << std::endl;
             }
 #endif
             // md is in terms of the temporary manager.
@@ -1122,12 +1135,11 @@ class fpa2bv_approx_tactic: public tactic {
             return md->translate(translator);
         }
 
-        void encode_fpa_terms(  goal_ref const & g,
-                obj_map<func_decl,app*> & const2term_map)
+        void encode_fpa_terms(goal_ref const & g, obj_map<func_decl,app*> & const2term_map)
         {
             for (obj_map<func_decl, app*>::iterator it = const2term_map.begin();
-                    it!=const2term_map.end();
-                    it++) {
+                 it != const2term_map.end();
+                 it++) {
                 expr_ref q(m);
 #ifdef Z3DEBUG
                 std::cout << "Adding " << it->m_key->get_name() << " = " << mk_ismt2_pp(it->m_value, m) << std::endl;
@@ -1148,9 +1160,9 @@ class fpa2bv_approx_tactic: public tactic {
                 obj_map<func_decl, unsigned> const2prec_map_tm;
 
                 for (obj_map<func_decl, unsigned>::iterator it = const2prec_map.begin();
-                        it!=const2prec_map.end();
-                        it++)
-                    const2prec_map_tm.insert(translator(it->m_key), it->m_value);
+                     it != const2prec_map.end();
+                     it++)
+                     const2prec_map_tm.insert(translator(it->m_key), it->m_value);
 
                 sat::solver sat_solver(m_params, 0);
                 atom2bool_var atom_map(*m_temp_manager);
@@ -1205,7 +1217,6 @@ class fpa2bv_approx_tactic: public tactic {
                 }
                 g->update(idx, new_curr, new_pr, g->dep(idx));
             }
-
 
             constants.set(const_rewriter.m_cfg.m_introduced_consts);
             const2term_map->swap(const_rewriter.m_cfg.m_const2term_map);
@@ -1341,7 +1352,7 @@ class fpa2bv_approx_tactic: public tactic {
                         solved = true;
 #ifdef Z3DEBUG
                         std::cout<<"Model is at full precision, no patching needed!"<<std::endl;
-			std::cout.flush();
+                        std::cout.flush();
 #endif
                     }
                     else {

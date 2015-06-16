@@ -3,22 +3,23 @@ Copyright (c) 2012 Microsoft Corporation
 
 Module Name:
 
-    fpa2bv_rewriter.h
+    fpa2bv_rewriter_prec.h
 
 Abstract:
 
-    Rewriter for converting FPA to BV
+    Rewriter for converting FPA to BV with precision control.
 
 Author:
 
     Christoph (cwinter) 2012-02-09
+    Aleksandar Zeljic 2014
 
 Notes:
 
 --*/
 
-#ifndef _FPA2BV_REWRITER_H_
-#define _FPA2BV_REWRITER_H_
+#ifndef _FPA2BV_REWRITER_PREC_H_
+#define _FPA2BV_REWRITER_PREC_H_
 
 #include"cooperate.h"
 #include"rewriter_def.h"
@@ -57,14 +58,15 @@ struct fpa2bv_rewriter_prec_cfg : public default_rewriter_cfg {
         m_out.finalize();
     }
 
-    unsigned get_precision(func_decl * f){
+    unsigned get_precision(func_decl * f) {
     	if(cnst2prec_map->contains(f))
     		return cnst2prec_map->find(f);
     	else return precision;
     }
+
     void set_precision(unsigned p) { precision=p; }
-    void set_mappings(obj_map<func_decl,unsigned> * o2p)
-    {
+    
+    void set_mappings(obj_map<func_decl,unsigned> * o2p) {
     	this->cnst2prec_map=o2p;
     }
 
@@ -93,7 +95,6 @@ struct fpa2bv_rewriter_prec_cfg : public default_rewriter_cfg {
 
         if (m().is_eq(f)) {
             SASSERT(num == 2);
-            //SASSERT(m().get_sort(args[0]) == m().get_sort(args[1]));
             sort * ds = f->get_domain()[0];
             if (m_conv.is_float(ds)) {
                 m_conv.mk_eq(args[0], args[1], result);
@@ -105,8 +106,7 @@ struct fpa2bv_rewriter_prec_cfg : public default_rewriter_cfg {
             }
             return BR_FAILED;
         }
-
-    	if (m().is_ite(f)) {
+        else if (m().is_ite(f)) {
     		SASSERT(num == 3);
     		if (m_conv.is_float(args[1])) {
     			m_conv.mk_ite(args[0], args[1], args[2], result);
@@ -114,13 +114,17 @@ struct fpa2bv_rewriter_prec_cfg : public default_rewriter_cfg {
     		}
     		return BR_FAILED;
     	}
+        else if (m().is_distinct(f)) {
+            sort * ds = f->get_domain()[0];
+            if (m_conv.is_float(ds) || m_conv.is_rm(ds)) {
+                m_conv.mk_distinct(f, num, args, result);
+                return BR_DONE;
+            }
+            return BR_FAILED;
+        }
 
-    	expr_ref  newAssertion(m_manager);
-
-    	if (m_conv.is_float_family(f))
-    	{
-    		switch (f->get_decl_kind())
-    		{
+    	if (m_conv.is_float_family(f)) {
+    		switch (f->get_decl_kind()) {
     		case OP_FPA_RM_NEAREST_TIES_TO_AWAY:
     		case OP_FPA_RM_NEAREST_TIES_TO_EVEN:
     		case OP_FPA_RM_TOWARD_NEGATIVE:
@@ -143,12 +147,12 @@ struct fpa2bv_rewriter_prec_cfg : public default_rewriter_cfg {
     		case OP_FPA_DIV:
     			m_conv.mk_div(f, get_precision(f), num, args, result); return BR_DONE;
     		case OP_FPA_REM:
-    			m_conv.mk_remainder(f, get_precision(f), num, args, result); return BR_DONE;
+    			m_conv.mk_rem(f, get_precision(f), num, args, result); return BR_DONE;
 			case OP_FPA_ABS: m_conv.mk_abs(f, get_precision(f), num, args, result); return BR_DONE;
     		case OP_FPA_MIN: m_conv.mk_min(f, get_precision(f), num, args, result); return BR_DONE;
     		case OP_FPA_MAX: m_conv.mk_max(f, get_precision(f), num, args, result); return BR_DONE;    		
 			case OP_FPA_FMA:
-    			m_conv.mk_fusedma(f, get_precision(f), num, args, result); return BR_DONE;
+    			m_conv.mk_fma(f, get_precision(f), num, args, result); return BR_DONE;
     		case OP_FPA_SQRT:
     			m_conv.mk_sqrt(f, get_precision(f), num, args, result); return BR_DONE;
     		case OP_FPA_ROUND_TO_INTEGRAL: m_conv.mk_round_to_integral(f,  get_precision(f), num, args, result); return BR_DONE;

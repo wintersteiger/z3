@@ -131,44 +131,6 @@ bool fpa_decl_plugin::is_numeral(expr * n, mpf & val) {
     return false;
 }
 
-bool fpa_decl_plugin::is_numeral(expr * n, unsigned e_bits, unsigned s_bits, mpf_rounding_mode rm, mpf & val) {
-    if (is_app_of(n, m_family_id, OP_FPA_NUM)) {
-        m_fm.set(val,e_bits, s_bits, rm, m_values[to_app(n)->get_decl()->get_parameter(0).get_ext_id()]);
-        return true;
-    }
-    else if (is_app_of(n, m_family_id, OP_FPA_MINUS_INF)) {
-        unsigned ebits = to_app(n)->get_decl()->get_range()->get_parameter(0).get_int();
-        unsigned sbits = to_app(n)->get_decl()->get_range()->get_parameter(1).get_int();
-        m_fm.mk_ninf(ebits, sbits, val);
-        return true;
-    }
-    else if (is_app_of(n, m_family_id, OP_FPA_PLUS_INF)) {
-        unsigned ebits = to_app(n)->get_decl()->get_range()->get_parameter(0).get_int();
-        unsigned sbits = to_app(n)->get_decl()->get_range()->get_parameter(1).get_int();
-        m_fm.mk_pinf(ebits, sbits, val);
-        return true;
-    }
-    else if (is_app_of(n, m_family_id, OP_FPA_NAN)) {
-        unsigned ebits = to_app(n)->get_decl()->get_range()->get_parameter(0).get_int();
-        unsigned sbits = to_app(n)->get_decl()->get_range()->get_parameter(1).get_int();
-        m_fm.mk_nan(ebits, sbits, val);
-        return true;
-    }
-    else if (is_app_of(n, m_family_id, OP_FPA_PLUS_ZERO)) {
-        unsigned ebits = to_app(n)->get_decl()->get_range()->get_parameter(0).get_int();
-        unsigned sbits = to_app(n)->get_decl()->get_range()->get_parameter(1).get_int();
-        m_fm.mk_pzero(ebits, sbits, val);
-        return true;
-    }
-    else if (is_app_of(n, m_family_id, OP_FPA_MINUS_ZERO)) {
-        unsigned ebits = to_app(n)->get_decl()->get_range()->get_parameter(0).get_int();
-        unsigned sbits = to_app(n)->get_decl()->get_range()->get_parameter(1).get_int();
-        m_fm.mk_nzero(ebits, sbits, val);
-        return true;
-    }
-    return false;
-}
-
 bool fpa_decl_plugin::is_numeral(expr * n) {
     scoped_mpf v(m_fm);
     return is_numeral(n, v);
