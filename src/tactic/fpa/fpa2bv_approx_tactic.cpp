@@ -30,7 +30,7 @@
 #include"sat_solver.h"
 #include"fpa_decl_plugin.h"
 #include"fpa2bv_converter_prec.h"
-#include"fpa2bv_model_converter.h"
+#include"fpa2bv_model_converter_prec.h"
 #include"fpa2bv_converter.h"
 #include"propagate_values_tactic.h"
 #include"fpa2bv_rewriter_prec.h"
@@ -326,12 +326,14 @@ class fpa2bv_approx_tactic: public tactic {
                     smallfloat_model->eval(arg, arg_e[i], true);
                     bool c = m_float_util.is_numeral(arg_e[i], arg_val[i]);
                     SASSERT(c);
+#ifdef Z3DEBUG
                     std::cout << "Small-float model value for " << mk_ismt2_pp(arg, m) << " is " << std::endl <<
                         mk_ismt2_pp(arg_e[i], m) << " == " << 
                         mpf_mngr.to_string(arg_val[i]) << std::endl;
                     std::cout << "Types are:" << std::endl <<
                         mk_ismt2_pp(to_app(arg)->get_decl(), m) << " and" << std::endl <<
                         mk_ismt2_pp(to_app(arg_e[i])->get_decl(), m) << std::endl;
+#endif
 
                     if (children_have_finite_err &&
                         err_est.contains(arg) &&
@@ -501,12 +503,12 @@ class fpa2bv_approx_tactic: public tactic {
                 model_ref const & mdl,
                 obj_map<expr, mpf*> & actual_value,
                 mpf & rhs_value,
-                mpf & est_rhs_value){
+                mpf & est_rhs_value) {
 
             mpf_manager & mpf_mngr = m_float_util.fm();
             expr_ref exp(m);
             mdl->eval(rhs, exp, true);
-            m_float_util.is_numeral(exp, rhs_value); //OLD:is_value
+            m_float_util.is_numeral(exp, rhs_value);
 
             if (actual_value.contains(rhs))
                 mpf_mngr.set(est_rhs_value, *actual_value.find(rhs));
@@ -581,7 +583,7 @@ class fpa2bv_approx_tactic: public tactic {
 
         void evaluate_and_patch(
                 func_decl_ref_vector const & cnsts,
-                model_ref const & mdl,
+                model_ref const & smallfloat_mdl,
                 model_ref & full_mdl,
                 goal_ref const & g,
                 obj_map<func_decl,app*> & cnst2term_map,
@@ -610,7 +612,7 @@ class fpa2bv_approx_tactic: public tactic {
 #ifdef Z3DEBUG
                         std::cout << "Evaluating: " << lhs << " == " << mk_ismt2_pp(rhs, m) << std::endl;
 #endif
-                        mdl->eval(lhs, lhs_eval, true);
+                        smallfloat_mdl->eval(lhs, lhs_eval, true);
 
                         if (m_float_util.is_numeral(lhs_eval, lhs_value)) {//OLD:is_value
                             bool precise_children = true;
@@ -618,14 +620,14 @@ class fpa2bv_approx_tactic: public tactic {
                             bool children_have_finite_err = true;
 
 
-                            obtain_values(lhs, rhs, mdl, full_mdl, cnst2term_map, precise_op, actual_value,
+                            obtain_values(lhs, rhs, smallfloat_mdl, full_mdl, cnst2term_map, precise_op, actual_value,
                                           err_est, rm, precise_children, seen_all_children, children_have_finite_err, 
                                           arg_val, est_arg_val, bv_arg_val);
 
 
                             if (seen_all_children) { //If some arguments are not evaluated yet, skip
                                 if (rhs->get_num_args() == 0)
-                                    evaluate_constant(rhs, mdl, actual_value, rhs_value, est_rhs_value);
+                                    evaluate_constant(rhs, smallfloat_mdl, actual_value, rhs_value, est_rhs_value);
                                 else
                                     full_semantics_eval(rhs, rm, arg_val, est_arg_val, bv_arg_val, rhs_value, est_rhs_value);
 
@@ -719,7 +721,9 @@ class fpa2bv_approx_tactic: public tactic {
                     !full_mdl->get_const_interp(mdl->get_constant(j)))
                 {
                     mdl->eval(mdl->get_constant(j), res);
+#ifdef Z3DEBUG
                     std::cout << " " << mdl->get_constant(j)->get_name() << " := " << mk_ismt2_pp(res, m) << std::endl;
+#endif
                     full_mdl->register_decl(mdl->get_constant(j), res);
                 }
             }
@@ -1016,8 +1020,7 @@ class fpa2bv_approx_tactic: public tactic {
                 expr * curr = g->form(idx);
                 fpa2bv_p_rw(curr, new_curr, new_pr);
 #ifdef Z3DEBUG
-                std::cout << "A(" << idx << "): " << mk_ismt2_pp(curr, m) << " --> " << 
-                    mk_ismt2_pp(new_curr, m) << std::endl;
+                std::cout << mk_ismt2_pp(curr, m) << std::endl;
 #endif
                 m_num_steps += fpa2bv_p_rw.get_num_steps();
                 if (m_proofs_enabled) {
@@ -1079,10 +1082,10 @@ class fpa2bv_approx_tactic: public tactic {
         }
 
         model_ref get_fpa_model(goal_ref const & g,
-                fpa2bv_converter_prec & fpa2bv,
-                bit_blaster_rewriter & bv2bool,
-                sat::solver & solver,
-                atom2bool_var & map) {
+                                fpa2bv_converter_prec & fpa2bv,
+                                bit_blaster_rewriter & bv2bool,
+                                sat::solver & solver,
+                                atom2bool_var & map) {
             // CMW: This is all done using the temporary manager, until at the very end we translate the model back to this->m.
             model_ref md = alloc(model, *m_temp_manager);
             sat::model const & ll_m = solver.get_model();
@@ -1106,16 +1109,25 @@ class fpa2bv_approx_tactic: public tactic {
 
             TRACE("sat_tactic", model_v2_pp(tout, *md););
             model_converter_ref bb_mc = mk_bit_blaster_model_converter(*m_temp_manager, bv2bool.const2bits());
-
-            model_converter_ref bv_mc = mk_fpa2bv_model_converter(*m_temp_manager, fpa2bv.const2bv(), fpa2bv.rm_const2bv(), fpa2bv.uf2bvuf(), fpa2bv.uf23bvuf());
+            model_converter_ref bv_mc = mk_fpa2bv_model_converter_prec(*m_temp_manager, fpa2bv.const2bv(), fpa2bv.rm_const2bv(), fpa2bv.uf2bvuf(), fpa2bv.uf23bvuf());
             bb_mc->operator()(md, 0);
             bv_mc->operator()(md, 0);
 
 #ifdef Z3DEBUG
             std::cout << "Model: " << std::endl;
             for (unsigned i = 0 ; i < md->get_num_constants(); i++) {
-                func_decl * d = md->get_constant(i);
-                std::cout << d->get_name() << " = " << mk_ismt2_pp(md->get_const_interp(d), *m_temp_manager) << std::endl;
+                expr_ref mv(*m_temp_manager);
+                func_decl * d = md->get_constant(i);                
+                mv = md->get_const_interp(d);
+                std::cout << d->get_name() << " = " << mk_ismt2_pp(mv, *m_temp_manager);
+                family_id fid = m_temp_manager->get_family_id("fpa");
+                fpa_decl_plugin * p = (fpa_decl_plugin*) m_temp_manager->get_plugin(fid);
+                mpf_manager & mm = p->fm();
+                scoped_mpf mmv(mm);
+                fpa_util fu(*m_temp_manager);
+                if (fu.is_numeral(mv, mmv))
+                    std::cout << " = " << mm.to_string(mmv);
+                std::cout << std::endl;
             }
 #endif
             // md is in terms of the temporary manager.
@@ -1123,12 +1135,11 @@ class fpa2bv_approx_tactic: public tactic {
             return md->translate(translator);
         }
 
-        void encode_fpa_terms(  goal_ref const & g,
-                obj_map<func_decl,app*> & const2term_map)
+        void encode_fpa_terms(goal_ref const & g, obj_map<func_decl,app*> & const2term_map)
         {
             for (obj_map<func_decl, app*>::iterator it = const2term_map.begin();
-                    it!=const2term_map.end();
-                    it++) {
+                 it != const2term_map.end();
+                 it++) {
                 expr_ref q(m);
 #ifdef Z3DEBUG
                 std::cout << "Adding " << it->m_key->get_name() << " = " << mk_ismt2_pp(it->m_value, m) << std::endl;

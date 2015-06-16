@@ -7,11 +7,12 @@ Module Name:
 
 Abstract:
 
-    Conversion routines for Floating Point -> Bit-Vector
+    Conversion routines for Floating Point -> Bit-Vector with precision control.
 
 Author:
 
     Christoph (cwinter) 2012-02-09
+    Aleksandar Zeljic 2014
 
 Notes:
 
@@ -71,15 +72,16 @@ void fpa2bv_converter_prec::mk_const(func_decl * f, unsigned prec, expr_ref & re
                 unsigned new_sbits = (unsigned) (rel * (double)sbits);
                 if (new_ebits < MIN_EBITS) new_ebits = MIN_EBITS;
                 if (new_sbits < MIN_SBITS) new_sbits = MIN_SBITS;
-                sort_ref ns(m), fp_srt(m);
+                sort_ref ns(m);
                 ns = fu().mk_float_sort(new_ebits, new_sbits);
                 app_ref small_const(m);
                 small_const = m.mk_fresh_const("small_const", ns);
 
-                fp_srt = fu().mk_float_sort(ebits, sbits);
-                symbol name("asFloat");
-                sort_ref rm_sort(m);
-                rm_sort = fu().mk_rm_sort();
+                // sort_ref fp_srt(m);
+                //fp_srt = fu().mk_float_sort(ebits, sbits);
+                //symbol name("to_fp");
+                //sort_ref rm_sort(m);
+                //rm_sort = fu().mk_rm_sort();
                 //sort * domain[2] = { rm_sort, ns };
                 //parameter parameters[2] = { parameter(ebits), parameter(sbits) };
 
@@ -89,7 +91,7 @@ void fpa2bv_converter_prec::mk_const(func_decl * f, unsigned prec, expr_ref & re
                 m.inc_ref(result.get());
 #ifdef Z3DEBUG
                 std::cout << f->get_name() << " := " << small_const->get_decl()->get_name() <<
-                        " [" << new_sbits<<","<<new_ebits<<"]"<<std::endl;
+                        " [" << new_sbits << "," << new_ebits << "]" << std::endl;
                 std::cout.flush();
 #endif
                 TRACE("fpa2bv_prec", tout << f->get_name() << " := " << mk_ismt2_pp(result, m) << std::endl;);
@@ -137,19 +139,8 @@ void fpa2bv_converter_prec::mk_small_op(func_decl * f, unsigned new_ebits, unsig
                 if (a_i_srt == new_srt)
                     cast_args.push_back(a_i);
                 else {
-                    app_ref rtz(m);
-                    rtz = fu().mk_round_toward_zero();
-                    expr_ref rm(m);
-                    fpa2bv_converter::mk_rounding_mode(rtz->get_decl(), rm);
-                
-                    sort * d[2] = { rm_srt, a_i_srt };                                
-                    symbol name("asFloat");
-                    func_decl_ref fd(m);
-                    fd = m.mk_func_decl(name, 2, d, new_srt, func_decl_info(fu().get_family_id(), OP_FPA_TO_FP, new_srt->get_num_parameters(), new_srt->get_parameters()));
-             
                     expr_ref t(m);
-                    expr * args[2] = { rm, a_i };
-                    fpa2bv_converter::mk_to_fp(fd, 2, args, t);
+                    mk_cast_small_to_big(new_sbits, new_ebits, a_i, t);
                     cast_args.push_back(t);
                     SASSERT(is_well_sorted(m, t));
                 }
@@ -167,15 +158,14 @@ void fpa2bv_converter_prec::mk_small_op(func_decl * f, unsigned new_ebits, unsig
     // May I reuse parts of the existing declaration? CMW: Sure.
 
     small_op = m.mk_func_decl(f->get_name(), num, new_domain.c_ptr(), new_srt,
-                                func_decl_info(fu().get_family_id(), f->get_decl_kind(), 2, parameters));
+                              func_decl_info(fu().get_family_id(), f->get_decl_kind(), 2, parameters));
 
-    //std::cout<<small_op->get_name()<<"["<<new_sbits<<","<<new_ebits<<"] ";
-    //for(unsigned i=0; i<num;i++)
-        //std::cout<<mk_ismt2_pp(cast_args[i].get(),m);
-    //std::cout<<std::endl;
-    //std::cout.flush();
+    //std::cout << small_op->get_name() << "[" << new_sbits << "," << new_ebits << "] ";
+    //for(unsigned i=0; i<num; i++)
+    //    std::cout << mk_ismt2_pp(cast_args[i].get(), m);
+    //std::cout << std::endl;
+}
 
-};
 void fpa2bv_converter_prec::mk_small_op(func_decl * f, unsigned prec, unsigned num, expr * const * args, func_decl_ref & small_op, expr_ref_vector & cast_args) {
     unsigned ebits = fu().get_ebits(f->get_range());
     unsigned sbits = fu().get_sbits(f->get_range());
@@ -188,20 +178,7 @@ void fpa2bv_converter_prec::mk_small_op(func_decl * f, unsigned prec, unsigned n
 void fpa2bv_converter_prec::mk_cast_small_to_big(func_decl * f, expr * arg, expr_ref & result) {
     unsigned ebits = fu().get_ebits(f->get_range());
     unsigned sbits = fu().get_sbits(f->get_range());
-
-    app_ref rtz(m);
-    rtz = fu().mk_round_toward_zero();
-    expr_ref rm(m);
-    fpa2bv_converter::mk_rounding_mode(rtz->get_decl(), rm);
-    sort_ref rm_srt(m);
-    rm_srt = fu().mk_rm_sort();
-    sort * d[2] = { rm_srt, to_app(arg)->get_decl()->get_range() };
-    parameter parameters[2] = { parameter(ebits), parameter(sbits) };
-    symbol name("asFloat");
-    func_decl_ref cast_up(m);
-    cast_up = m.mk_func_decl(name, 2, d, f->get_range(), func_decl_info(fu().get_family_id(), OP_FPA_TO_FP, f->get_range()->get_num_parameters(), parameters));
-    expr * args[2] = { rm, arg };
-    fpa2bv_converter::mk_to_fp(cast_up, 2, args, result);
+    mk_cast_small_to_big(sbits, ebits, arg, result);
 }
 
 void fpa2bv_converter_prec::mk_cast_small_to_big(unsigned sbits, unsigned ebits, expr * arg, expr_ref & result) {
@@ -213,7 +190,7 @@ void fpa2bv_converter_prec::mk_cast_small_to_big(unsigned sbits, unsigned ebits,
     rm_srt = fu().mk_rm_sort();
     sort * d[2] = { rm_srt, to_app(arg)->get_decl()->get_range() };
     parameter parameters[2] = { parameter(ebits), parameter(sbits) };
-    symbol name("asFloat");
+    symbol name("to_fp");
     func_decl_ref cast_up(m);
     sort_ref ns(m);
     ns = fu().mk_float_sort(ebits, sbits);
@@ -221,7 +198,6 @@ void fpa2bv_converter_prec::mk_cast_small_to_big(unsigned sbits, unsigned ebits,
     expr * args[2] = { rm, arg };
     fpa2bv_converter::mk_to_fp(cast_up, 2, args, result);
 }
-
 
 void fpa2bv_converter_prec::match_sorts(expr * a, expr * b, expr_ref & n_a, expr_ref & n_b)
 {
@@ -1436,15 +1412,16 @@ void fpa2bv_converter_prec::establish_sort(unsigned num, expr * const * args, un
     //hardcoding for now
     ebits = 3;
     sbits = 3;
-    for(unsigned i=0;i<num;i++)
+    for(unsigned i=0; i<num; i++)
     {
-        sort * s;
-        if(is_app(args[i]) && fu().is_float(s = to_app(args[i])->get_decl()->get_range()))
-        {
-            ne = fu().get_ebits(s);
-            ns = fu().get_sbits(s);
-            ebits = (ne < ebits)?ebits:ne;
-            sbits = (ns < sbits)?sbits:ns;
+        if (is_app(args[i])) {
+            sort * s = to_app(args[i])->get_decl()->get_range();
+            if (fu().is_float(s)) {
+                ne = fu().get_ebits(s);
+                ns = fu().get_sbits(s);
+                ebits = (ne < ebits) ? ebits : ne;
+                sbits = (ns < sbits) ? sbits : ns;
+            }
         }
     }
 }
@@ -1452,25 +1429,24 @@ void fpa2bv_converter_prec::establish_sort(unsigned num, expr * const * args, un
 void fpa2bv_converter_prec::mk_float_eq(func_decl * f, unsigned num, expr * const * args, expr_ref & result)
 {
     switch (m_mode) {
-        case FPAA_PRECISE:
-        case FPAA_FIXBITS:
-            fpa2bv_converter::mk_float_eq(f,num,args,result);
-            break;
-        case FPAA_SMALL_FLOATS:
-        {
-            unsigned sbits, ebits;
+    case FPAA_PRECISE:
+    case FPAA_FIXBITS:
+        fpa2bv_converter::mk_float_eq(f, num, args, result);
+        break;
+    case FPAA_SMALL_FLOATS:
+    {
+        unsigned sbits, ebits;
 
-            func_decl_ref small_fd(m);
-            expr_ref_vector small_args(m);
-            establish_sort(num, args, ebits, sbits);
-            mk_small_op(f, ebits, sbits, num, args, small_fd, small_args);
-            fpa2bv_converter::mk_float_eq(small_fd, num, small_args.c_ptr(), result);
-            SASSERT(is_well_sorted(m, result));
-            TRACE("fpa2bv_small_float_add", tout << mk_ismt2_pp(result, m) << std::endl; );
-            break;
-        }
+        func_decl_ref small_fd(m);
+        expr_ref_vector small_args(m);
+        establish_sort(num, args, ebits, sbits);
+        mk_small_op(f, ebits, sbits, num, args, small_fd, small_args);
+        fpa2bv_converter::mk_float_eq(small_fd, num, small_args.c_ptr(), result);
+        SASSERT(is_well_sorted(m, result));
+        TRACE("fpa2bv_small_float_eq", tout << mk_ismt2_pp(result, m) << std::endl;);
+        break;
     }
-
+    }
 }
 
 void fpa2bv_converter_prec::mk_float_lt(func_decl * f, unsigned num, expr * const * args, expr_ref & result)

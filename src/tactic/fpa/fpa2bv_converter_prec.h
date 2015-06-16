@@ -7,11 +7,12 @@ Module Name:
 
 Abstract:
 
-    Conversion routines for Floating Point -> Bit-Vector
+    Conversion routines for Floating Point -> Bit-Vector with precision control.
 
 Author:
 
     Christoph (cwinter) 2012-02-09
+    Aleksandar Zeljic 2014
 
 Notes:
 
