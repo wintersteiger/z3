@@ -999,9 +999,11 @@ class fpa2bv_approx_tactic: public tactic {
         void bitblast(goal_ref const & g,
                       fpa2bv_converter_prec & fpa2bv,
                       bit_blaster_rewriter & bv2bool,
-                      obj_map<func_decl,unsigned> & const2prec_map,
+                      obj_map<func_decl, unsigned> & const2prec_map,
                       sat::solver & solver,
-                      atom2bool_var & map)
+                      atom2bool_var & map,
+                      expr_ref_vector const & core_labels_t,
+                      sat::literal_vector & core_literals)
         {
             // CMW: This is all done using the temporary manager!
             expr_ref new_curr(*m_temp_manager);
@@ -1065,8 +1067,7 @@ class fpa2bv_approx_tactic: public tactic {
             g->elim_redundancies();
 
             goal2sat::dep2asm_map d2am ;
-            m_goal2sat(*g, m_params, solver, map,  d2am , false);
-
+            m_goal2sat(*g, m_params, solver, map, d2am, true);
 
             TRACE("sat_solver_unknown", tout << "interpreted_atoms: " << map.interpreted_atoms() << "\n";
             atom2bool_var::iterator it = map.begin();
@@ -1075,6 +1076,14 @@ class fpa2bv_approx_tactic: public tactic {
                 if (!is_uninterp_const(it->m_key))
                     tout << mk_ismt2_pp(it->m_key, *m_temp_manager) << "\n";
             });
+
+            for (unsigned i = 0; i < core_labels_t.size(); i++) 
+            {                
+                expr2var::var v = map.to_var(core_labels_t[i]);
+                SASSERT(v != UINT_MAX);
+                sat::literal l(v, false);
+                core_literals.push_back(l);
+            }
 
             CASSERT("sat_solver", solver.check_invariant());
             IF_VERBOSE(TACTIC_VERBOSITY_LVL, solver.display_status(verbose_stream()););
@@ -1135,6 +1144,23 @@ class fpa2bv_approx_tactic: public tactic {
             return md->translate(translator);
         }
 
+        void get_unsat_core(sat::solver & sat_solver,
+                            atom2bool_var & atom_map)
+        {
+            expr_ref_vector lit2expr(*m_temp_manager);
+            lit2expr.resize(sat_solver.num_vars() * 2);
+            atom_map.mk_inv(lit2expr);
+
+            sat::literal_vector const & core = sat_solver.get_core();
+            std::cout << "Unsat core: " << std::endl;
+            for (unsigned i = 0; i < core.size(); i++) {
+                expr_ref t(*m_temp_manager);
+                t = lit2expr.get(core[i].index());
+                std::cout << core[i] << " <=> " << mk_ismt2_pp(t, *m_temp_manager) << std::endl;
+            }
+            std::cout << std::endl;
+        }
+
         void encode_fpa_terms(goal_ref const & g, obj_map<func_decl,app*> & const2term_map)
         {
             for (obj_map<func_decl, app*>::iterator it = const2term_map.begin();
@@ -1149,7 +1175,9 @@ class fpa2bv_approx_tactic: public tactic {
             }
         }
 
-        lbool approximate_model_construction(goal_ref & g, obj_map<func_decl, unsigned> & const2prec_map) {
+        lbool approximate_model_construction(goal_ref & g,
+                                             expr_ref_vector const & core_labels,
+                                             obj_map<func_decl, unsigned> & const2prec_map) {
             lbool r = l_undef;
             // CMW: The following will introduce lots of stuff that we don't need (e.g., symbols)
             // To save memory, we use a separate, new manager that we can throw away afterwards.
@@ -1158,29 +1186,42 @@ class fpa2bv_approx_tactic: public tactic {
                 ast_translation translator(m, *m_temp_manager);
                 goal_ref ng = g->translate(translator);
                 obj_map<func_decl, unsigned> const2prec_map_tm;
+                expr_ref_vector core_labels_t(*m_temp_manager);
+                sat::literal_vector core_literals;
 
                 for (obj_map<func_decl, unsigned>::iterator it = const2prec_map.begin();
                      it != const2prec_map.end();
                      it++)
                      const2prec_map_tm.insert(translator(it->m_key), it->m_value);
 
+                for (unsigned i = 0; i < core_labels.size(); i++)
+                    core_labels_t.push_back(translator(core_labels[i]));
+
                 sat::solver sat_solver(m_params, 0);
                 atom2bool_var atom_map(*m_temp_manager);
                 { tactic_report report_i("fpa2bv_approx_before_bitblaster", *ng); }
                 fpa2bv_converter_prec fpa2bv(*m_temp_manager, m_mode);
                 bit_blaster_rewriter bv2bool(*m_temp_manager, m_params);
-                bitblast(ng, fpa2bv, bv2bool, const2prec_map_tm, sat_solver, atom_map);
+                bitblast(ng, fpa2bv, bv2bool, const2prec_map_tm, sat_solver, atom_map,
+                         core_labels_t, core_literals);
                 { tactic_report report_i("fpa2bv_approx_after_bitblaster", *ng); }
 #ifdef Z3DEBUG
                 std::cout << "Iteration variables: " << sat_solver.num_vars() << std::endl;
                 std::cout << "Iteration clauses: " << sat_solver.num_clauses() << std::endl;
 #endif
-                r = sat_solver.check();
+                // CMW: We pass the core_literals vector of assumption literals to the
+                // SAT solver; for now this is always the whole set of core labels.
+                r = sat_solver.check(core_literals.size(), core_literals.c_ptr());
 
                 if (r == l_true)
                 {
                     // we need to get the model and translate it back to m.
                     m_fpa_model = get_fpa_model(ng, fpa2bv, bv2bool, sat_solver, atom_map).get();
+                }
+                else if (r == l_false) 
+                {
+                    // unsat, we need to extract the core.
+                    get_unsat_core(sat_solver, atom_map);
                 }
                 else
                     m_fpa_model = 0;
@@ -1292,8 +1333,8 @@ class fpa2bv_approx_tactic: public tactic {
         }
 
         virtual void operator()(goal_ref const & g, goal_ref_buffer & result,
-                model_converter_ref & mc, proof_converter_ref & pc,
-                expr_dependency_ref & core) {
+                                model_converter_ref & mc, proof_converter_ref & pc,
+                                expr_dependency_ref & core) {
             bool solved=false;
             mc = 0;
             pc = 0;
@@ -1331,15 +1372,31 @@ class fpa2bv_approx_tactic: public tactic {
                 sw.start();
 
                 // Copy the goal
-                goal_ref  mg(alloc(goal, g->m(),g->proofs_enabled(),g->models_enabled(),g->unsat_core_enabled()));
-                mg->copy_from(*g.get());
+                goal_ref  mg(alloc(goal, g->m(), g->proofs_enabled(), true, true));
+                
+                // CMW: We need "labels" associated with each constraint. Later, the 
+                // unsat cores will be presented to us in the form of these labels. Each
+                // label is a Boolean variable that implies the constraint and we will then
+                // pass an "assumption" to the solver that asserts that the literal must 
+                // be true. So, the semantics are not changed, but now we have "variable
+                // names" associated with the constraint.
+                // Later, this will also allow us to retract some (but not all) of the 
+                // constraints by assuming those labels to be false.
+                expr_ref_vector core_labels(g->m());
+                
+                for (unsigned i = 0; i < g->size(); i++) {
+                    expr_ref core_label(g->m());
+                    core_label = g->m().mk_fresh_const("fpa2bv_approx_core_label", g->m().mk_bool_sort());
+                    core_labels.push_back(core_label);
+                    mg->assert_expr(g->m().mk_implies(core_label, g->form(i)));
+                }
                 tactic_report report_i("fpa2bv_approx_i", *mg);
 
                 print_constants(constants, const2prec_map);
 
                 TRACE("fpa2bv_approx_goal_i", mg->display(tout); );
-
-                r = approximate_model_construction(mg, const2prec_map);
+                    
+                r = approximate_model_construction(mg, core_labels, const2prec_map);
 #ifdef Z3DEBUG
                 std::cout << "Approximation is " << (r==l_true?"SAT":r==l_false?"UNSAT":"UNKNOWN") << std::endl;
 #endif
