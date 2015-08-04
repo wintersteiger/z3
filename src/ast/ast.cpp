@@ -1018,14 +1018,18 @@ func_decl * basic_decl_plugin::mk_ite_decl(sort * s) {
 
 sort* basic_decl_plugin::join(sort* s1, sort* s2) {
     if (s1 == s2) return s1;
-    if (s1->get_family_id() == m_manager->m_arith_family_id && 
+    if (s1->get_family_id() == m_manager->m_arith_family_id &&
         s2->get_family_id() == m_manager->m_arith_family_id) {
         if (s1->get_decl_kind() == REAL_SORT) {
             return s1;
         }
+        return s2;
     }
-    return s2;
+    std::ostringstream buffer;
+    buffer << "Sorts " << mk_pp(s1, *m_manager) << " and " << mk_pp(s2, *m_manager) << " are incompatible";
+    throw ast_exception(buffer.str().c_str());
 }
+
 
 func_decl * basic_decl_plugin::mk_func_decl(decl_kind k, unsigned num_parameters, parameter const * parameters,
                                           unsigned arity, sort * const * domain, sort * range) {
@@ -2046,8 +2050,14 @@ inline app * ast_manager::mk_app_core(func_decl * decl, expr * arg1, expr * arg2
 }
 
 app * ast_manager::mk_app(func_decl * decl, unsigned num_args, expr * const * args) {
-    if (decl->get_arity() != num_args && !decl->is_right_associative() && 
-        !decl->is_left_associative() && !decl->is_chainable()) {
+    bool type_error = 
+        decl->get_arity() != num_args && !decl->is_right_associative() && 
+        !decl->is_left_associative() && !decl->is_chainable();
+
+    type_error |= (decl->get_arity() != num_args && num_args < 2 && 
+                   decl->get_family_id() == m_basic_family_id && !decl->is_associative());
+
+    if (type_error) {
         std::ostringstream buffer;
         buffer << "Wrong number of arguments (" << num_args 
                << ") passed to function " << mk_pp(decl, *this);        

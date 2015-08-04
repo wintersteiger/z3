@@ -18,8 +18,8 @@ Author:
 Notes:
 
 --*/
-#ifndef _CMD_CONTEXT_H_
-#define _CMD_CONTEXT_H_
+#ifndef CMD_CONTEXT_H_
+#define CMD_CONTEXT_H_
 
 #include<sstream>
 #include"ast.h"
@@ -325,6 +325,7 @@ public:
     check_sat_result * get_check_sat_result() const { return m_check_sat_result.get(); }
     check_sat_state cs_state() const;
     void validate_model();
+    void display_model(model_ref& mdl);
 
     void register_plugin(symbol const & name, decl_plugin * p, bool install_names);    
     bool is_func_decl(symbol const & s) const;

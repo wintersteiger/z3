@@ -16,8 +16,8 @@ Author:
 Revision History:
 
 --*/
-#ifndef _DL_CONTEXT_H_
-#define _DL_CONTEXT_H_
+#ifndef DL_CONTEXT_H_
+#define DL_CONTEXT_H_
 
 #ifdef _CYGWIN
 #undef min
@@ -277,6 +277,7 @@ namespace datalog {
         bool instantiate_quantifiers() const;
         bool xform_bit_blast() const;        
         bool xform_slice() const;
+        bool xform_coi() const;
 
         void register_finite_sort(sort * s, sort_kind k);
 
@@ -585,5 +586,5 @@ namespace datalog {
 
 };
 
-#endif /* _DL_CONTEXT_H_ */
+#endif /* DL_CONTEXT_H_ */
 
