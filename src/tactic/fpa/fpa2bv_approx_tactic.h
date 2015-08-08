@@ -23,9 +23,8 @@ Notes:
 class ast_manager;
 class tactic;
 
-
-
 tactic * mk_fpa2bv_approx_tactic(ast_manager & m, params_ref const & p = params_ref());
+
 /*
   ADD_TACTIC("fpa2bv_approx", "An iterative approximation based bit-blasting decision procedure for FPA.", "mk_fpa2bv_approx_tactic(m, p)")
 */

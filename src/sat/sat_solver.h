@@ -16,8 +16,8 @@ Author:
 Revision History:
 
 --*/
-#ifndef _SAT_SOLVER_H_
-#define _SAT_SOLVER_H_
+#ifndef SAT_SOLVER_H_
+#define SAT_SOLVER_H_
 
 #include"sat_types.h"
 #include"sat_clause.h"
@@ -447,7 +447,7 @@ namespace sat {
 
     protected:
         void display_binary(std::ostream & out) const;
-        void display_units(std::ostream & out) const;
+        void display_units(std::ostream & out) const;        
         bool is_unit(clause const & c) const;
         bool is_empty(clause const & c) const;
         bool check_missed_propagation(clause_vector const & cs) const;

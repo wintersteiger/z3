@@ -16,8 +16,8 @@ Author:
 Revision History:
 
 --*/
-#ifndef _THEORY_ARITH_CORE_H_
-#define _THEORY_ARITH_CORE_H_
+#ifndef THEORY_ARITH_CORE_H_
+#define THEORY_ARITH_CORE_H_
 
 #include"smt_context.h"
 #include"theory_arith.h"
@@ -2154,6 +2154,7 @@ namespace smt {
         CASSERT("arith", wf_rows());
         CASSERT("arith", wf_columns());
         CASSERT("arith", valid_row_assignment());
+        CASSERT("arith", satisfy_bounds());
         return true;
     }
 
@@ -3064,6 +3065,10 @@ namespace smt {
         SASSERT(v != null_theory_var);
         inf_numeral const & val = get_value(v);
         rational num = val.get_rational().to_rational() + m_epsilon.to_rational() * val.get_infinitesimal().to_rational();
+        if (is_int(v) && !num.is_int()) {
+            TRACE("arith", tout << "Truncating non-integer value. This is possible for non-linear constraints v" << v << " " << num << "\n";);
+            num = floor(num);
+        }
         return alloc(expr_wrapper_proc, m_factory->mk_value(num, is_int(v)));
     }
 
@@ -3317,5 +3322,5 @@ namespace smt {
 
 };
 
-#endif /* _THEORY_ARITH_CORE_H_ */
+#endif /* THEORY_ARITH_CORE_H_ */
 
