@@ -120,7 +120,35 @@ class fpa2bv_approx_tactic: public tactic {
             }
         }
 
-        bool proof_guided_refinement(
+
+		bool proof_guided_refinement(
+			goal_ref const & g,
+			func_decl_ref_vector const & cnsts,
+			obj_map<func_decl, unsigned> & cnst2prec_map,
+			obj_map<func_decl, unsigned> & new_map)
+		{
+			return naive_proof_guided_refinement(g,cnsts,cnst2prec_map,new_map);
+		}
+
+		bool unsat_core_based_proof_guided_refinement(
+			goal_ref const & g,
+			func_decl_ref_vector const & cnsts,
+			obj_map<func_decl, unsigned> & cnst2prec_map,
+			obj_map<func_decl, unsigned> & new_map)
+		{
+			// We have no model. Let's just increase precision of everything.
+			bool res = false;
+			for (unsigned i = 0; i < cnsts.size(); i++)
+			{
+				unsigned old = cnst2prec_map.find(cnsts.get(i));
+				unsigned n = old + PREC_INCREMENT;
+				if (old >= MAX_PRECISION) n = MAX_PRECISION;
+				else { if (n > MAX_PRECISION) n = MAX_PRECISION; res = true; }
+				new_map.insert(cnsts.get(i), n);
+			}
+			return res;
+		}
+        bool naive_proof_guided_refinement(
                 goal_ref const & g,
                 func_decl_ref_vector const & cnsts,
                 obj_map<func_decl, unsigned> & cnst2prec_map,
@@ -1144,21 +1172,28 @@ class fpa2bv_approx_tactic: public tactic {
             return md->translate(translator);
         }
 
-        void get_unsat_core(sat::solver & sat_solver,
-                            atom2bool_var & atom_map)
+		void get_unsat_core(sat::solver & sat_solver,
+                            atom2bool_var & atom_map,
+							expr_ref_vector & out_core)
         {
             expr_ref_vector lit2expr(*m_temp_manager);
             lit2expr.resize(sat_solver.num_vars() * 2);
             atom_map.mk_inv(lit2expr);
 
             sat::literal_vector const & core = sat_solver.get_core();
+			
             std::cout << "Unsat core: " << std::endl;
-            for (unsigned i = 0; i < core.size(); i++) {
-                expr_ref t(*m_temp_manager);
-                t = lit2expr.get(core[i].index());
-                std::cout << core[i] << " <=> " << mk_ismt2_pp(t, *m_temp_manager) << std::endl;
-            }
+			ast_translation translator(*m_temp_manager, this->m);
+			for (unsigned i = 0; i < core.size(); i++) {
+				expr_ref e(*m_temp_manager);
+				e = lit2expr.get(core[i].index());
+
+				expr * t_e = translator(e.get());
+				out_core.push_back(t_e);
+				std::cout << core[i] << " <=> " << mk_ismt2_pp(e, *m_temp_manager) << std::endl;
+			}
             std::cout << std::endl;
+			return;
         }
 
         void encode_fpa_terms(goal_ref const & g, obj_map<func_decl,app*> & const2term_map)
@@ -1177,7 +1212,8 @@ class fpa2bv_approx_tactic: public tactic {
 
         lbool approximate_model_construction(goal_ref & g,
                                              expr_ref_vector const & core_labels,
-                                             obj_map<func_decl, unsigned> & const2prec_map) {
+                                             obj_map<func_decl, unsigned> & const2prec_map,
+											 expr_ref_vector & out_core) {
             lbool r = l_undef;
             // CMW: The following will introduce lots of stuff that we don't need (e.g., symbols)
             // To save memory, we use a separate, new manager that we can throw away afterwards.
@@ -1217,11 +1253,12 @@ class fpa2bv_approx_tactic: public tactic {
                 {
                     // we need to get the model and translate it back to m.
                     m_fpa_model = get_fpa_model(ng, fpa2bv, bv2bool, sat_solver, atom_map).get();
+					CASSERT("Core should be null",out_core == NULL);
                 }
                 else if (r == l_false) 
                 {
                     // unsat, we need to extract the core.
-                    get_unsat_core(sat_solver, atom_map);
+                    get_unsat_core(sat_solver, atom_map, out_core);					
                 }
                 else
                     m_fpa_model = 0;
@@ -1344,6 +1381,7 @@ class fpa2bv_approx_tactic: public tactic {
             func_decl_ref_vector constants(m);
             obj_map<func_decl, app*> const2term_map;
             lbool r = l_true;
+			expr_ref_vector core(m);
             unsigned iteration_cnt = 0;
             stopwatch sw;
 
@@ -1395,8 +1433,8 @@ class fpa2bv_approx_tactic: public tactic {
                 print_constants(constants, const2prec_map);
 
                 TRACE("fpa2bv_approx_goal_i", mg->display(tout); );
-                    
-                r = approximate_model_construction(mg, core_labels, const2prec_map);
+				core.reset();
+                r = approximate_model_construction(mg, core_labels, const2prec_map, core);
 #ifdef Z3DEBUG
                 std::cout << "Approximation is " << (r==l_true?"SAT":r==l_false?"UNSAT":"UNKNOWN") << std::endl;
 #endif
