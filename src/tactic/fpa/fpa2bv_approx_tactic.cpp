@@ -123,31 +123,14 @@ class fpa2bv_approx_tactic: public tactic {
 
 		bool proof_guided_refinement(
 			goal_ref const & g,
-			func_decl_ref_vector const & cnsts,
+			func_decl_ref_vector const & cnsts_to_increment,
+			func_decl_ref_vector const & cnsts_to_keep,
 			obj_map<func_decl, unsigned> & cnst2prec_map,
 			obj_map<func_decl, unsigned> & new_map)
 		{
-			return naive_proof_guided_refinement(g,cnsts,cnst2prec_map,new_map);
+			return naive_proof_guided_refinement(g,cnsts_to_keep,cnst2prec_map,new_map);
 		}
-
-		bool unsat_core_based_proof_guided_refinement(
-			goal_ref const & g,
-			func_decl_ref_vector const & cnsts,
-			obj_map<func_decl, unsigned> & cnst2prec_map,
-			obj_map<func_decl, unsigned> & new_map)
-		{
-			// We have no model. Let's just increase precision of everything.
-			bool res = false;
-			for (unsigned i = 0; i < cnsts.size(); i++)
-			{
-				unsigned old = cnst2prec_map.find(cnsts.get(i));
-				unsigned n = old + PREC_INCREMENT;
-				if (old >= MAX_PRECISION) n = MAX_PRECISION;
-				else { if (n > MAX_PRECISION) n = MAX_PRECISION; res = true; }
-				new_map.insert(cnsts.get(i), n);
-			}
-			return res;
-		}
+				
         bool naive_proof_guided_refinement(
                 goal_ref const & g,
                 func_decl_ref_vector const & cnsts,
@@ -857,10 +840,100 @@ class fpa2bv_approx_tactic: public tactic {
                     }
                 }
             }
-
         }
 
-        void increase_precision(
+		bool increase_term_precision(
+			app * cur,
+			func_decl_ref_vector const & cnsts,
+			obj_map<func_decl, unsigned> & cnst2prec_map,
+			obj_map<func_decl, app*> & cnst2term_map,
+			obj_map<func_decl, unsigned> & new_map){
+			
+			func_decl * f = cur->get_decl();
+			unsigned new_prec = 0, old_prec;
+			bool in_new_map;
+
+			if (cnst2prec_map.contains(f))
+				new_prec += cnst2prec_map.find(f);
+
+			if (new_prec >= MAX_PRECISION)
+				return false;
+			
+
+			new_prec += PREC_INCREMENT;
+			new_prec = (new_prec > MAX_PRECISION) ? MAX_PRECISION : new_prec;
+			new_map.insert(f, new_prec);
+
+#ifdef Z3DEBUG
+			std::cout << f->get_name() << ":" << new_prec << std::endl;
+			std::cout << mk_ismt2_pp(cur, m) << ":" << new_prec << std::endl;
+#endif
+
+			if (cnst2term_map.contains(f))
+				cur = cnst2term_map.find(f);
+			// Refine constants that are direct arguments of this term
+			for (unsigned i = 0; i < cur->get_num_args(); i++){
+				func_decl * arg_decl = to_app(cur->get_arg(i))->get_decl();
+				if (!cnst2term_map.contains(arg_decl) && //Not a constant introduced by flattening
+					!m_float_util.is_rm(cur->get_arg(i)) && //OLD:is_rm(...,rm)
+					!m_float_util.is_numeral(cur->get_arg(i))) { //OLD:is_value
+					//It is an input 'variable'
+					if ((in_new_map = new_map.contains(arg_decl)))
+						old_prec = new_map.find(arg_decl);
+					else if (cnst2prec_map.contains(arg_decl))
+						old_prec = cnst2prec_map.find(arg_decl);
+					else
+						old_prec = 0;
+
+					if (old_prec < new_prec) {
+						if (in_new_map)
+							new_map.remove(arg_decl);
+						SASSERT(new_prec <= MAX_PRECISION);
+						new_map.insert(arg_decl, new_prec);
+#ifdef Z3DEBUG
+						std::cout << "    " << arg_decl->get_name() << ":" << new_prec << std::endl;
+
+						std::cout << "    " << mk_ismt2_pp(cur->get_arg(i), m) << ":" << new_prec << std::endl;
+#endif
+					}
+				}
+			}			
+#ifdef Z3DEBUG
+			std::cout.flush();
+#endif
+			return true;
+		}
+
+		// If new_map is empty, increments precision of all constants
+		// otherwise copies the missing precision values
+		void complete_precision_map(
+			func_decl_ref_vector const & cnsts,
+			obj_map<func_decl, unsigned> & cnst2prec_map,			
+			obj_map<func_decl, unsigned> & new_map){
+			
+			if (new_map.size() > 0) {
+				//Complete precision map
+				func_decl * f;
+				for (unsigned j = 0; j<cnsts.size(); j++)
+					if (!new_map.contains((f = cnsts.get(j))))
+						new_map.insert(f, cnst2prec_map.find(f));
+				
+			}
+			else { //No precision was increased then we increase all of them
+				func_decl * f;
+				unsigned prec = 0;
+				for (unsigned j = 0; j<cnsts.size(); j++){
+					f = cnsts.get(j);
+					prec = cnst2prec_map.find(f);
+					prec += PREC_INCREMENT;
+					prec = (prec > MAX_PRECISION) ? MAX_PRECISION : prec;
+					new_map.insert(f, prec);
+				}
+			}
+		}
+
+
+        void increase_precision_by_rank(
                 std::list <struct pair *> & ranked_terms,
                 func_decl_ref_vector const & cnsts,
                 obj_map<func_decl, unsigned> & cnst2prec_map,
@@ -875,82 +948,37 @@ class fpa2bv_approx_tactic: public tactic {
             for(std::list<struct pair *>::iterator itp = ranked_terms.begin();
                     itp != ranked_terms.end();
                     itp++) {
-                app * cur = to_app((*itp)->exp);
-                func_decl * f = cur->get_decl();
-                unsigned new_prec = 0, old_prec;
-                bool in_new_map;
-
-                if (cnst2prec_map.contains(f))
-                    new_prec += cnst2prec_map.find(f);
-
-                if (new_prec >= MAX_PRECISION)
-                    continue;
-
-                new_prec += PREC_INCREMENT;
-                new_prec= (new_prec > MAX_PRECISION) ? MAX_PRECISION : new_prec;
-                new_map.insert(f, new_prec);
-
-#ifdef Z3DEBUG
-                std::cout << f->get_name() << ":" << new_prec << std::endl;
-                std::cout << mk_ismt2_pp(cur, m) << ":" << new_prec << std::endl;
-#endif
-
-                if(cnst2term_map.contains(f))
-                    cur = cnst2term_map.find(f);
-                // Refine constants that are direct arguments of this term
-                for(unsigned i=0; i<cur->get_num_args();i++){
-                    func_decl * arg_decl = to_app(cur->get_arg(i))->get_decl();
-                    if (!cnst2term_map.contains(arg_decl) && //Not a constant introduced by flattening
-                            !m_float_util.is_rm(cur->get_arg(i)) && //OLD:is_rm(...,rm)
-                            !m_float_util.is_numeral(cur->get_arg(i))) { //OLD:is_value
-                        //It is an input 'variable'
-                        if ( (in_new_map = new_map.contains(arg_decl)))
-                            old_prec=new_map.find(arg_decl);
-                        else if (cnst2prec_map.contains(arg_decl))
-                            old_prec = cnst2prec_map.find(arg_decl);
-                        else
-                            old_prec=0;
-
-                        if (old_prec < new_prec) {
-                            if (in_new_map)
-                                new_map.remove(arg_decl);
-                            SASSERT(new_prec <= MAX_PRECISION);
-                            new_map.insert(arg_decl, new_prec);
-#ifdef Z3DEBUG
-                            std::cout << "    " << arg_decl->get_name() << ":" << new_prec << std::endl;
-
-                            std::cout<<"    "<<mk_ismt2_pp(cur->get_arg(i),m)<<":"<<new_prec<<std::endl;
-#endif
-                        }
-                    }
-                }
-#ifdef Z3DEBUG
-                std::cout.flush();
-#endif
+				increase_term_precision(to_app((*itp)->exp), cnsts, cnst2prec_map, cnst2term_map, new_map);
                 delete *itp;
             }
 
-            if (new_map.size() > 0) {
-            //Complete precision map
-            func_decl * f;
-            for(unsigned j=0; j<cnsts.size();j++)
-                if(!new_map.contains((f=cnsts.get(j))))
-                    new_map.insert(f, cnst2prec_map.find(f));
-            }
-            else { //No precision was increased then we increase all of them
-                func_decl * f;
-                unsigned prec = 0;
-                for(unsigned j=0; j<cnsts.size();j++){
-                    f = cnsts.get(j);
-                    prec = cnst2prec_map.find(f);
-                    prec += PREC_INCREMENT;
-                    prec = (prec > MAX_PRECISION) ? MAX_PRECISION : prec;
-                    new_map.insert(f, prec);
-                }
-            }
-
+			complete_precision_map(cnsts, cnst2prec_map, new_map);
 
         }
+
+		bool increase_precision_from_core(
+			expr_ref_vector & from_core,
+			func_decl_ref_vector const & cnsts,
+			obj_map<func_decl, unsigned> & cnst2prec_map,
+			obj_map<func_decl, app*> & cnst2term_map,
+			obj_map<func_decl, unsigned> & new_map){
+
+			//Refine chosen terms and find the any input 'variables' which are
+			//its immediate arguments and refine them as well
+#ifdef Z3DEBUG
+			std::cout << "Increasing precision:" << std::endl;
+#endif
+			bool updated = false;
+			for (unsigned i = 0; i < from_core.size(); i ++) {
+				updated |= increase_term_precision(to_app(from_core.get(i)), cnsts, cnst2prec_map, cnst2term_map, new_map);				
+			}
+			
+			if (updated)
+				complete_precision_map(cnsts, cnst2prec_map, new_map);
+
+			return updated;
+			
+		}
 
 
         void model_guided_approximation_refinement(
@@ -970,11 +998,13 @@ class fpa2bv_approx_tactic: public tactic {
             boolean_comparison_of_models(g, mdl, full_mdl, cnst2term_map, expr_count);
             calculate_relative_error(err_est, expr_count, err_ratio_map);
             if (err_ratio_map.empty()) {
-                proof_guided_refinement(g,cnsts,cnst2prec_map,new_map);
+				//assert(new_map.isEmpty())
+				complete_precision_map(cnsts, cnst2prec_map, new_map);
+				//proof_guided_refinement(g,cnsts,cnst2prec_map,new_map);
             }
             else {
                 rank_terms (err_ratio_map,cnst2prec_map,ranked_terms);
-                increase_precision(ranked_terms,cnsts,cnst2prec_map,cnst2term_map,new_map);
+                increase_precision_by_rank(ranked_terms,cnsts,cnst2prec_map,cnst2term_map,new_map);
             }
         }
 
@@ -1174,7 +1204,7 @@ class fpa2bv_approx_tactic: public tactic {
 
 		void get_unsat_core(sat::solver & sat_solver,
                             atom2bool_var & atom_map,
-							expr_ref_vector & out_core)
+							expr_ref_vector & core_labels)
         {
             expr_ref_vector lit2expr(*m_temp_manager);
             lit2expr.resize(sat_solver.num_vars() * 2);
@@ -1189,7 +1219,7 @@ class fpa2bv_approx_tactic: public tactic {
 				e = lit2expr.get(core[i].index());
 
 				expr * t_e = translator(e.get());
-				out_core.push_back(t_e);
+				core_labels.push_back(t_e);
 				std::cout << core[i] << " <=> " << mk_ismt2_pp(e, *m_temp_manager) << std::endl;
 			}
             std::cout << std::endl;
@@ -1253,7 +1283,7 @@ class fpa2bv_approx_tactic: public tactic {
                 {
                     // we need to get the model and translate it back to m.
                     m_fpa_model = get_fpa_model(ng, fpa2bv, bv2bool, sat_solver, atom_map).get();
-					CASSERT("Core should be null",out_core == NULL);
+					//ASSERT("Core should be null", out_core == NULL);
                 }
                 else if (r == l_false) 
                 {
@@ -1369,6 +1399,15 @@ class fpa2bv_approx_tactic: public tactic {
 #endif
         }
 
+		void get_terms_from_core(goal_ref mg, expr_ref_vector & core_labels, expr_ref_vector & core_lits, expr_ref_vector & out_relevant_constants){
+			for (unsigned i = 0; i < mg->size(); i++) {
+				app * c = to_app(mg->form(i));
+				if (c->get_kind() == OP_IMPLIES && core_lits.contains(c->get_arg(0))){
+					out_relevant_constants.push_back(c->get_arg(1));
+				}				
+			}
+		}
+
         virtual void operator()(goal_ref const & g, goal_ref_buffer & result,
                                 model_converter_ref & mc, proof_converter_ref & pc,
                                 expr_dependency_ref & core) {
@@ -1381,7 +1420,7 @@ class fpa2bv_approx_tactic: public tactic {
             func_decl_ref_vector constants(m);
             obj_map<func_decl, app*> const2term_map;
             lbool r = l_true;
-			expr_ref_vector core(m);
+			expr_ref_vector out_core_labels(m);
             unsigned iteration_cnt = 0;
             stopwatch sw;
 
@@ -1434,7 +1473,7 @@ class fpa2bv_approx_tactic: public tactic {
 
                 TRACE("fpa2bv_approx_goal_i", mg->display(tout); );
 				core.reset();
-                r = approximate_model_construction(mg, core_labels, const2prec_map, core);
+				r = approximate_model_construction(mg, core_labels, const2prec_map, out_core_labels);
 #ifdef Z3DEBUG
                 std::cout << "Approximation is " << (r==l_true?"SAT":r==l_false?"UNSAT":"UNKNOWN") << std::endl;
 #endif
@@ -1463,7 +1502,9 @@ class fpa2bv_approx_tactic: public tactic {
                         verify_precise_model(g,full_mdl,constants,const2term_map,mc,result);
 
                 } else if (r == l_false) {
-                    if(!proof_guided_refinement(g, constants, const2prec_map, next_const2prec_map))
+					expr_ref_vector relevant_terms(m); 
+					get_terms_from_core(mg, core_labels , out_core_labels, relevant_terms);					
+					if (!increase_precision_from_core(relevant_terms, constants, const2prec_map, const2term_map, next_const2prec_map))
                     {// Refinement failed -> This is unsat.
                         solved = true;
                         result.back()->reset();
