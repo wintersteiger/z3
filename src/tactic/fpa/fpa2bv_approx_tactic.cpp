@@ -970,7 +970,8 @@ class fpa2bv_approx_tactic: public tactic {
 #endif
 			bool updated = false;
 			for (unsigned i = 0; i < from_core.size(); i ++) {
-				updated |= increase_term_precision(to_app(from_core.get(i)), cnsts, cnst2prec_map, cnst2term_map, new_map);				
+			    app * to_refine = to_app(from_core.get(i));
+				updated |= increase_term_precision(to_refine, cnsts, cnst2prec_map, cnst2term_map, new_map);
 			}
 			
 			if (updated)
@@ -1402,7 +1403,7 @@ class fpa2bv_approx_tactic: public tactic {
 		void get_terms_from_core(goal_ref mg, expr_ref_vector & core_labels, expr_ref_vector & core_lits, expr_ref_vector & out_relevant_constants){
 			for (unsigned i = 0; i < mg->size(); i++) {
 				app * c = to_app(mg->form(i));
-				if (c->get_kind() == OP_IMPLIES && core_lits.contains(c->get_arg(0))){
+				if (c->get_decl_kind() == OP_IMPLIES && core_lits.contains(c->get_arg(0))){
 					out_relevant_constants.push_back(c->get_arg(1));
 				}				
 			}
