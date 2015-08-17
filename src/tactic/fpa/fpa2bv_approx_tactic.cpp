@@ -856,11 +856,12 @@ class fpa2bv_approx_tactic: public tactic {
 			if (cnst2prec_map.contains(f))
 				new_prec += cnst2prec_map.find(f);
 
-			if (new_prec < MAX_PRECISION)
-				new_prec += PREC_INCREMENT;
+			if (new_prec < MAX_PRECISION){
+                new_prec += PREC_INCREMENT;
                 new_prec = (new_prec > MAX_PRECISION) ? MAX_PRECISION : new_prec;
                 new_map.insert(f, new_prec);
-
+                res = true;
+			}
 #ifdef Z3DEBUG
 			std::cout << f->get_name() << ":" << new_prec << std::endl;
 			std::cout << mk_ismt2_pp(cur, m) << ":" << new_prec << std::endl;
