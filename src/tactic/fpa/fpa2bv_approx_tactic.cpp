@@ -852,17 +852,14 @@ class fpa2bv_approx_tactic: public tactic {
 			func_decl * f = cur->get_decl();
 			unsigned new_prec = 0, old_prec;
 			bool in_new_map;
-
+			bool res = false;
 			if (cnst2prec_map.contains(f))
 				new_prec += cnst2prec_map.find(f);
 
-			if (new_prec >= MAX_PRECISION)
-				return false;
-			
-
-			new_prec += PREC_INCREMENT;
-			new_prec = (new_prec > MAX_PRECISION) ? MAX_PRECISION : new_prec;
-			new_map.insert(f, new_prec);
+			if (new_prec < MAX_PRECISION)
+				new_prec += PREC_INCREMENT;
+                new_prec = (new_prec > MAX_PRECISION) ? MAX_PRECISION : new_prec;
+                new_map.insert(f, new_prec);
 
 #ifdef Z3DEBUG
 			std::cout << f->get_name() << ":" << new_prec << std::endl;
@@ -890,6 +887,7 @@ class fpa2bv_approx_tactic: public tactic {
 							new_map.remove(arg_decl);
 						SASSERT(new_prec <= MAX_PRECISION);
 						new_map.insert(arg_decl, new_prec);
+						res = true;
 #ifdef Z3DEBUG
 						std::cout << "    " << arg_decl->get_name() << ":" << new_prec << std::endl;
 
@@ -901,7 +899,7 @@ class fpa2bv_approx_tactic: public tactic {
 #ifdef Z3DEBUG
 			std::cout.flush();
 #endif
-			return true;
+			return res;
 		}
 
 		// If new_map is empty, increments precision of all constants
@@ -971,6 +969,9 @@ class fpa2bv_approx_tactic: public tactic {
 			bool updated = false;
 			for (unsigned i = 0; i < from_core.size(); i ++) {
 			    app * to_refine = to_app(from_core.get(i));
+			    std::cout << "Attempting: " << mk_ismt2_pp(to_refine,m) << std::endl;
+			            //<< ":" << cnst2prec_map.find(to_refine->get_decl())
+
 				updated |= increase_term_precision(to_refine, cnsts, cnst2prec_map, cnst2term_map, new_map);
 			}
 			
@@ -1421,7 +1422,7 @@ class fpa2bv_approx_tactic: public tactic {
             func_decl_ref_vector constants(m);
             obj_map<func_decl, app*> const2term_map;
             lbool r = l_true;
-			expr_ref_vector out_core_labels(m);
+
             unsigned iteration_cnt = 0;
             stopwatch sw;
 
@@ -1461,7 +1462,7 @@ class fpa2bv_approx_tactic: public tactic {
                 // Later, this will also allow us to retract some (but not all) of the 
                 // constraints by assuming those labels to be false.
                 expr_ref_vector core_labels(g->m());
-                
+                expr_ref_vector out_core_labels(g->m());
                 for (unsigned i = 0; i < g->size(); i++) {
                     expr_ref core_label(g->m());
                     core_label = g->m().mk_fresh_const("fpa2bv_approx_core_label", g->m().mk_bool_sort());
@@ -1473,7 +1474,7 @@ class fpa2bv_approx_tactic: public tactic {
                 print_constants(constants, const2prec_map);
 
                 TRACE("fpa2bv_approx_goal_i", mg->display(tout); );
-				core.reset();
+
 				r = approximate_model_construction(mg, core_labels, const2prec_map, out_core_labels);
 #ifdef Z3DEBUG
                 std::cout << "Approximation is " << (r==l_true?"SAT":r==l_false?"UNSAT":"UNKNOWN") << std::endl;
