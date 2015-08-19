@@ -972,8 +972,12 @@ class fpa2bv_approx_tactic: public tactic {
 			    app * to_refine = to_app(from_core.get(i));
 			    std::cout << "Attempting: " << mk_ismt2_pp(to_refine,m) << std::endl;
 			            //<< ":" << cnst2prec_map.find(to_refine->get_decl())
+			    if (cnsts.contains(to_refine->get_decl()))
+			        updated |= increase_term_precision(to_refine, cnsts, cnst2prec_map, cnst2term_map, new_map);
+			    else
+			        for (unsigned j=0; j < to_refine->get_num_args(); j++)
+			            from_core.push_back(to_refine->get_arg(j));
 
-				updated |= increase_term_precision(to_refine, cnsts, cnst2prec_map, cnst2term_map, new_map);
 			}
 			
 			if (updated)
