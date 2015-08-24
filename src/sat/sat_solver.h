@@ -60,6 +60,7 @@ namespace sat {
         unsigned m_minimized_lits;
         unsigned m_dyn_sub_res;
         unsigned m_non_learned_generation;
+        unsigned m_blocked_corr_sets;
         stats() { reset(); }
         void reset();
         void collect_statistics(statistics & st) const;
@@ -239,7 +240,6 @@ namespace sat {
             if (memory::get_allocation_size() > m_config.m_max_memory) throw solver_exception(Z3_MAX_MEMORY_MSG);
         }
         typedef std::pair<literal, literal> bin_clause;
-        void initialize_soft(unsigned sz, literal const* lits, double const* weights);
     protected:
         watch_list & get_wlist(literal l) { return m_watches[l.index()]; }
         watch_list const & get_wlist(literal l) const { return m_watches[l.index()]; }
@@ -271,11 +271,16 @@ namespace sat {
         //
         // -----------------------
     public:
-        lbool check(unsigned num_lits = 0, literal const* lits = 0);
+        lbool check(unsigned num_lits = 0, literal const* lits = 0) {
+            return check(num_lits, lits, 0, 0);
+        }
+        lbool check(unsigned num_lits, literal const* lits, double const* weights, double max_weight);
+
         model const & get_model() const { return m_model; }
         bool model_is_current() const { return m_model_is_current; }
         literal_vector const& get_core() const { return m_core; }
         model_converter const & get_model_converter() const { return m_mc; }
+        void set_model(model const& mdl);
 
     protected:
         unsigned m_conflicts;
@@ -291,7 +296,8 @@ namespace sat {
         bool_var next_var();
         lbool bounded_search();
         void init_search();
-        void init_assumptions(unsigned num_lits, literal const* lits);
+        void init_assumptions(unsigned num_lits, literal const* lits, double const* weights, double max_weight);
+        bool init_weighted_assumptions(unsigned num_lits, literal const* lits, double const* weights, double max_weight, svector<literal>& blocker);
         void reinit_assumptions();
         bool tracking_assumptions() const;
         bool is_assumption(literal l) const;
@@ -442,6 +448,7 @@ namespace sat {
         void display(std::ostream & out) const;
         void display_watches(std::ostream & out) const;
         void display_dimacs(std::ostream & out) const;
+        void display_wcnf(std::ostream & out, unsigned sz, literal const* lits, unsigned const* weights) const;
         void display_assignment(std::ostream & out) const;
         void display_justification(std::ostream & out, justification const& j) const;
 
