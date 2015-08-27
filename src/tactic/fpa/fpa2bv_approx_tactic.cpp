@@ -966,11 +966,12 @@ class fpa2bv_approx_tactic: public tactic {
 			//its immediate arguments and refine them as well
 #ifdef Z3DEBUG
 			std::cout << "Increasing precision:" << std::endl;
+			std::cout << "Core size: " << from_core.size() << std::endl;
 #endif
 			bool updated = false;
 			for (unsigned i = 0; i < from_core.size(); i ++) {
 			    app * to_refine = to_app(from_core.get(i));
-			    std::cout << "Attempting: " << mk_ismt2_pp(to_refine,m) << std::endl;
+			    //std::cout << "Attempting: " << mk_ismt2_pp(to_refine,m) << std::endl;
 			            //<< ":" << cnst2prec_map.find(to_refine->get_decl())
 			    if (cnsts.contains(to_refine->get_decl()))
 			        updated |= increase_term_precision(to_refine, cnsts, cnst2prec_map, cnst2term_map, new_map);
