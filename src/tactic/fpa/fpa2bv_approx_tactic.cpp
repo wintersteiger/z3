@@ -1220,24 +1220,28 @@ class fpa2bv_approx_tactic: public tactic {
 
 		void get_unsat_core(sat::solver & sat_solver,
                             atom2bool_var & atom_map,
-							expr_ref_vector & core_labels)
+							expr_ref_vector & core_exprs)
         {
-            expr_ref_vector lit2expr(*m_temp_manager);
-            lit2expr.resize(sat_solver.num_vars() * 2);
-            atom_map.mk_inv(lit2expr);
-
             sat::literal_vector const & core = sat_solver.get_core();
-			
+            
             //std::cout << "Unsat core: " << std::endl;
             //std::cout << "Core size: " << std::endl;
 			ast_translation translator(*m_temp_manager, this->m);
 			for (unsigned i = 0; i < core.size(); i++) {
-				expr_ref e(*m_temp_manager);
-				e = lit2expr.get(core[i].index());
-
-				expr * t_e = translator(e.get());
-				core_labels.push_back(t_e);
-				//std::cout << core[i] << " <=> " << mk_ismt2_pp(t_e, this->m) << std::endl;
+                sat::literal l = core[i];
+                int v = l.var();
+                bool found = false;
+                expr * e_tm;
+                for (atom2bool_var::iterator it = atom_map.begin();
+                     it != atom_map.end() && found == false;
+                     it++) {
+                    if (it->m_value == v) {
+                        found = true;
+                        e_tm = it->m_key;
+                    }
+                }
+                SASSERT(found);
+                core_exprs.push_back(translator(e_tm));
 			}
             std::cout << std::endl;
 			return;
