@@ -18,6 +18,8 @@
 
  --*/
 
+#include"rewriter_def.h"
+
 #include"tactical.h"
 #include"cooperate.h"
 #include"ref_util.h"

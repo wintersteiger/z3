@@ -22,11 +22,10 @@ Notes:
 #define _FPA2BV_REWRITER_PREC_H_
 
 #include"cooperate.h"
-#include"rewriter_def.h"
+#include"rewriter.h"
 #include"bv_decl_plugin.h"
 #include"fpa2bv_converter_prec.h"
 #include"tactic_exception.h"
-#include <vector>
 
 struct fpa2bv_rewriter_prec_cfg : public default_rewriter_cfg {
     ast_manager              & m_manager;    
@@ -40,7 +39,7 @@ struct fpa2bv_rewriter_prec_cfg : public default_rewriter_cfg {
 
     ast_manager & m() const { return m_manager; }
 
-    fpa2bv_rewriter_prec_cfg(ast_manager & m,  fpa2bv_converter_prec & c, params_ref const & p):
+    fpa2bv_rewriter_prec_cfg(ast_manager & m, fpa2bv_converter_prec & c, params_ref const & p):
         m_manager(m),
         m_out(m),
         m_conv(c) {
