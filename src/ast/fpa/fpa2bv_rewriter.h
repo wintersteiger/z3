@@ -21,7 +21,7 @@ Notes:
 #define FPA2BV_REWRITER_H_
 
 #include"cooperate.h"
-#include"rewriter_def.h"
+#include"rewriter.h"
 #include"bv_decl_plugin.h"
 #include"fpa2bv_converter.h"
 #include"fpa2bv_rewriter_params.hpp"
