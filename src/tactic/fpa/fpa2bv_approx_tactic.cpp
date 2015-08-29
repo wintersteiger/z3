@@ -171,6 +171,7 @@ class fpa2bv_approx_tactic: public tactic {
                 cur = to_app(to_traverse.front());
 #ifdef Z3DEBUG
                 std::cout<<"Analyze - traversing: "<<mk_ismt2_pp(cur,m)<<std::endl;
+
                 std::cout.flush();
 #endif
                 if (m_float_util.is_rm(cur) || m_float_util.is_numeral(cur)) {
@@ -733,7 +734,7 @@ class fpa2bv_approx_tactic: public tactic {
                 {
                     mdl->eval(mdl->get_constant(j), res);
 #ifdef Z3DEBUG
-                    std::cout << " " << mdl->get_constant(j)->get_name() << " := " << mk_ismt2_pp(res, m) << std::endl;
+                    //std::cout << " " << mdl->get_constant(j)->get_name() << " := " << mk_ismt2_pp(res, m) << std::endl;
 #endif
                     full_mdl->register_decl(mdl->get_constant(j), res);
                 }
@@ -844,6 +845,7 @@ class fpa2bv_approx_tactic: public tactic {
 
 		bool increase_term_precision(
 			app * cur,
+			bool isSat,
 			func_decl_ref_vector const & cnsts,
 			obj_map<func_decl, unsigned> & cnst2prec_map,
 			obj_map<func_decl, app*> & cnst2term_map,
@@ -857,14 +859,14 @@ class fpa2bv_approx_tactic: public tactic {
 				new_prec += cnst2prec_map.find(f);
 
 			if (new_prec < MAX_PRECISION){
-                new_prec += PREC_INCREMENT;
+			  new_prec += (isSat)? PREC_INCREMENT : MAX_PRECISION;
                 new_prec = (new_prec > MAX_PRECISION) ? MAX_PRECISION : new_prec;
                 new_map.insert(f, new_prec);
                 res = true;
 			}
 #ifdef Z3DEBUG
-			std::cout << f->get_name() << ":" << new_prec << std::endl;
-			std::cout << mk_ismt2_pp(cur, m) << ":" << new_prec << std::endl;
+			//std::cout << f->get_name() << ":" << new_prec << std::endl;
+			//std::cout << mk_ismt2_pp(cur, m) << ":" << new_prec << std::endl;
 #endif
 
 			if (cnst2term_map.contains(f))
@@ -890,9 +892,9 @@ class fpa2bv_approx_tactic: public tactic {
 						new_map.insert(arg_decl, new_prec);
 						res = true;
 #ifdef Z3DEBUG
-						std::cout << "    " << arg_decl->get_name() << ":" << new_prec << std::endl;
+						//std::cout << "    " << arg_decl->get_name() << ":" << new_prec << std::endl;
 
-						std::cout << "    " << mk_ismt2_pp(cur->get_arg(i), m) << ":" << new_prec << std::endl;
+						//std::cout << "    " << mk_ismt2_pp(cur->get_arg(i), m) << ":" << new_prec << std::endl;
 #endif
 					}
 				}
@@ -947,7 +949,7 @@ class fpa2bv_approx_tactic: public tactic {
             for(std::list<struct pair *>::iterator itp = ranked_terms.begin();
                     itp != ranked_terms.end();
                     itp++) {
-				increase_term_precision(to_app((*itp)->exp), cnsts, cnst2prec_map, cnst2term_map, new_map);
+	      increase_term_precision(to_app((*itp)->exp), true, cnsts, cnst2prec_map, cnst2term_map, new_map);
                 delete *itp;
             }
 
@@ -956,6 +958,7 @@ class fpa2bv_approx_tactic: public tactic {
         }
 
 		bool increase_precision_from_core(
+		    goal_ref & mg,
 			expr_ref_vector & from_core,
 			func_decl_ref_vector const & cnsts,
 			obj_map<func_decl, unsigned> & cnst2prec_map,
@@ -964,17 +967,20 @@ class fpa2bv_approx_tactic: public tactic {
 
 			//Refine chosen terms and find the any input 'variables' which are
 			//its immediate arguments and refine them as well
-#ifdef Z3DEBUG
-			std::cout << "Increasing precision:" << std::endl;
-			std::cout << "Core size: " << from_core.size() << std::endl;
-#endif
+
+
+			std::cout << "Core size: " << from_core.size() << "/ "<< mg->size() << std::endl;
+			for (unsigned i = 0; i < from_core.size(); i ++) {
+			    app * to_refine = to_app(from_core.get(i));
+			    //std::cout << mk_ismt2_pp(to_refine,m) << std::endl;
+			}
 			bool updated = false;
 			for (unsigned i = 0; i < from_core.size(); i ++) {
 			    app * to_refine = to_app(from_core.get(i));
 			    //std::cout << "Attempting: " << mk_ismt2_pp(to_refine,m) << std::endl;
 			            //<< ":" << cnst2prec_map.find(to_refine->get_decl())
 			    if (cnsts.contains(to_refine->get_decl()))
-			        updated |= increase_term_precision(to_refine, cnsts, cnst2prec_map, cnst2term_map, new_map);
+			      updated |= increase_term_precision(to_refine, false, cnsts, cnst2prec_map, cnst2term_map, new_map);
 			    else
 			        for (unsigned j=0; j < to_refine->get_num_args(); j++)
 			            from_core.push_back(to_refine->get_arg(j));
@@ -1088,7 +1094,7 @@ class fpa2bv_approx_tactic: public tactic {
                 expr * curr = g->form(idx);
                 fpa2bv_p_rw(curr, new_curr, new_pr);
 #ifdef Z3DEBUG
-                std::cout << mk_ismt2_pp(curr, m) << std::endl;
+                //std::cout << mk_ismt2_pp(curr, m) << std::endl;
 #endif
                 m_num_steps += fpa2bv_p_rw.get_num_steps();
                 if (m_proofs_enabled) {
@@ -1220,7 +1226,8 @@ class fpa2bv_approx_tactic: public tactic {
 
             sat::literal_vector const & core = sat_solver.get_core();
 			
-            std::cout << "Unsat core: " << std::endl;
+            //std::cout << "Unsat core: " << std::endl;
+            //std::cout << "Core size: " << std::endl;
 			ast_translation translator(*m_temp_manager, this->m);
 			for (unsigned i = 0; i < core.size(); i++) {
 				expr_ref e(*m_temp_manager);
@@ -1228,7 +1235,7 @@ class fpa2bv_approx_tactic: public tactic {
 
 				expr * t_e = translator(e.get());
 				core_labels.push_back(t_e);
-				std::cout << core[i] << " <=> " << mk_ismt2_pp(e, *m_temp_manager) << std::endl;
+				//std::cout << core[i] << " <=> " << mk_ismt2_pp(t_e, this->m) << std::endl;
 			}
             std::cout << std::endl;
 			return;
@@ -1279,10 +1286,10 @@ class fpa2bv_approx_tactic: public tactic {
                 bitblast(ng, fpa2bv, bv2bool, const2prec_map_tm, sat_solver, atom_map,
                          core_labels_t, core_literals);
                 { tactic_report report_i("fpa2bv_approx_after_bitblaster", *ng); }
-#ifdef Z3DEBUG
+
                 std::cout << "Iteration variables: " << sat_solver.num_vars() << std::endl;
                 std::cout << "Iteration clauses: " << sat_solver.num_clauses() << std::endl;
-#endif
+
                 // CMW: We pass the core_literals vector of assumption literals to the
                 // SAT solver; for now this is always the whole set of core labels.
                 r = sat_solver.check(core_literals.size(), core_literals.c_ptr());
@@ -1293,10 +1300,10 @@ class fpa2bv_approx_tactic: public tactic {
                     m_fpa_model = get_fpa_model(ng, fpa2bv, bv2bool, sat_solver, atom_map).get();
 					//ASSERT("Core should be null", out_core == NULL);
                 }
-                else if (r == l_false) 
+                else if (r == l_false)
                 {
                     // unsat, we need to extract the core.
-                    get_unsat_core(sat_solver, atom_map, out_core);					
+                    get_unsat_core(sat_solver, atom_map, out_core);
                 }
                 else
                     m_fpa_model = 0;
@@ -1416,6 +1423,103 @@ class fpa2bv_approx_tactic: public tactic {
 			}
 		}
 
+		lbool testCore(const goal_ref &mg, expr_ref_vector & core, obj_map<func_decl, unsigned> & const2prec_map ){
+		    goal_ref ng(alloc(goal, mg->m(), mg->proofs_enabled(), true, true));
+
+		    ng->reset_all();
+
+		    for (unsigned i = 0; i < core.size(); i++){
+		        ng->assert_expr(core.get(i));
+		    }
+
+		    obj_map<func_decl, unsigned> local_const2prec_map;
+
+		    for (obj_map<func_decl, unsigned>::iterator it = const2prec_map.begin();
+		            it != const2prec_map.end(); it++){
+		        local_const2prec_map.insert(it->m_key, MAX_PRECISION);
+		    }
+
+
+		    lbool r = l_undef;
+            // CMW: The following will introduce lots of stuff that we don't need (e.g., symbols)
+            // To save memory, we use a separate, new manager that we can throw away afterwards.
+            m_temp_manager = alloc(ast_manager, PGM_DISABLED);
+            {
+                ast_translation translator(m, *m_temp_manager);
+                goal_ref g = ng->translate(translator);
+                sat::solver sat_solver(m_params, 0);
+                atom2bool_var atom_map(*m_temp_manager);
+                { tactic_report report_i("fpa2bv_approx_unsat_core_check_before_bitblaster", *ng); }
+                fpa2bv_converter_prec fpa2bv(*m_temp_manager, m_mode);
+                bit_blaster_rewriter bv2bool(*m_temp_manager, m_params);
+
+
+                expr_ref new_curr(*m_temp_manager);
+                proof_ref new_pr(*m_temp_manager);
+                SASSERT(g->is_well_sorted());
+
+                simplify(g);
+
+                fpa2bv_rewriter_prec fpa2bv_p_rw(*m_temp_manager, fpa2bv, m_params);
+                fpa2bv_p_rw.m_cfg.set_mappings(&local_const2prec_map);
+                m_num_steps = 0;
+                unsigned size = g->size();
+                for (unsigned idx = 0; idx < size; idx++) {
+                    if (g->inconsistent())
+                        break;
+                    expr * curr = g->form(idx);
+                    fpa2bv_p_rw(curr, new_curr, new_pr);
+                    m_num_steps += fpa2bv_p_rw.get_num_steps();
+                    if (m_proofs_enabled) {
+                        proof * pr = g->pr(idx);
+                        new_pr = m_temp_manager->mk_modus_ponens(pr, new_pr);
+                    }
+                    g->update(idx, new_curr, new_pr, g->dep(idx));
+
+                    SASSERT(g->is_well_sorted());
+                }
+
+                SASSERT(g->is_well_sorted());
+
+                simplify(g);
+
+                //Bitblasting
+                TRACE("before_bit_blaster", g->display(tout););
+                m_num_steps = 0;
+                size = g->size();
+                for (unsigned idx = 0; idx < size; idx++) {
+                    if (g->inconsistent())
+                        break;
+                    expr * curr = g->form(idx);
+                    bv2bool(curr, new_curr, new_pr);
+                    m_num_steps += bv2bool.get_num_steps();
+                    if (m_proofs_enabled) {
+                        proof * pr = g->pr(idx);
+                        new_pr = m_temp_manager->mk_modus_ponens(pr, new_pr);
+                    }
+                    g->update(idx, new_curr, new_pr, g->dep(idx));
+                }
+
+                g->inc_depth();
+
+                simplify(g);
+
+                TRACE("before_sat_solver", g->display(tout););
+                g->elim_redundancies();
+
+                goal2sat::dep2asm_map d2am ;
+                m_goal2sat(*g, m_params, sat_solver, atom_map, d2am, true);
+
+                { tactic_report report_i("fpa2bv_approx_unsat_core_check_after_bitblaster", *ng); }
+
+                r = sat_solver.check();
+            }
+
+            dealloc(m_temp_manager);
+            m_temp_manager = 0;
+
+            return r;
+		}
         virtual void operator()(goal_ref const & g, goal_ref_buffer & result,
                                 model_converter_ref & mc, proof_converter_ref & pc,
                                 expr_dependency_ref & core) {
@@ -1450,9 +1554,9 @@ class fpa2bv_approx_tactic: public tactic {
 #endif
             while (!solved && !m_cancel)
             {
-#ifdef Z3DEBUG
+
                 std::cout << "=============== Starting iteration " << ++iteration_cnt << std::endl;
-#endif
+
                 sw.reset();
                 sw.start();
 
@@ -1477,14 +1581,14 @@ class fpa2bv_approx_tactic: public tactic {
                 }
                 tactic_report report_i("fpa2bv_approx_i", *mg);
 
-                print_constants(constants, const2prec_map);
+                //print_constants(constants, const2prec_map);
 
                 TRACE("fpa2bv_approx_goal_i", mg->display(tout); );
 
 				r = approximate_model_construction(mg, core_labels, const2prec_map, out_core_labels);
-#ifdef Z3DEBUG
+
                 std::cout << "Approximation is " << (r==l_true?"SAT":r==l_false?"UNSAT":"UNKNOWN") << std::endl;
-#endif
+
                 if (r == l_true) {
                     model_ref full_mdl = alloc(model, m);
                     obj_map<expr, double> err_est;
@@ -1511,8 +1615,9 @@ class fpa2bv_approx_tactic: public tactic {
 
                 } else if (r == l_false) {
 					expr_ref_vector relevant_terms(m); 
-					get_terms_from_core(mg, core_labels , out_core_labels, relevant_terms);					
-					if (!increase_precision_from_core(relevant_terms, constants, const2prec_map, const2term_map, next_const2prec_map))
+					get_terms_from_core(mg, core_labels , out_core_labels, relevant_terms);
+					lbool isTrueCore = testCore(g,relevant_terms,const2prec_map);
+					if ( isTrueCore == l_false|| !increase_precision_from_core(mg, relevant_terms, constants, const2prec_map, const2term_map, next_const2prec_map))
                     {// Refinement failed -> This is unsat.
                         solved = true;
                         result.back()->reset();
@@ -1526,14 +1631,14 @@ class fpa2bv_approx_tactic: public tactic {
 
                 const2prec_map.swap(next_const2prec_map);
                 next_const2prec_map.reset();
-#ifdef Z3DEBUG
+
                 std::cout << "Iteration time: " << sw.get_current_seconds() << std::endl;
-#endif
+
             }
-#ifdef Z3DEBUG
+
             std::cout << "=============== Terminating " << std::endl;          
             std::cout << "Iteration count: " << iteration_cnt << std::endl;
-#endif
+
 	    dec_ref_map_key_values(m, const2term_map);
         }
     };
