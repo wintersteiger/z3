@@ -16,6 +16,9 @@ Author:
 Notes:
 
 --*/
+
+#include"rewriter_def.h"
+
 #include"tactical.h"
 #include"fpa2bv_rewriter.h"
 #include"simplify_tactic.h"
