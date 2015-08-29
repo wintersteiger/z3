@@ -1445,85 +1445,9 @@ class fpa2bv_approx_tactic: public tactic {
 		        local_const2prec_map.insert(it->m_key, MAX_PRECISION);
 		    }
 
-
-		    lbool r = l_undef;
-            // CMW: The following will introduce lots of stuff that we don't need (e.g., symbols)
-            // To save memory, we use a separate, new manager that we can throw away afterwards.
-            m_temp_manager = alloc(ast_manager, PGM_DISABLED);
-            {
-                ast_translation translator(m, *m_temp_manager);
-                goal_ref g = ng->translate(translator);
-                sat::solver sat_solver(m_params, 0);
-                atom2bool_var atom_map(*m_temp_manager);
-                { tactic_report report_i("fpa2bv_approx_unsat_core_check_before_bitblaster", *ng); }
-                fpa2bv_converter_prec fpa2bv(*m_temp_manager, m_mode);
-                bit_blaster_rewriter bv2bool(*m_temp_manager, m_params);
-
-
-                expr_ref new_curr(*m_temp_manager);
-                proof_ref new_pr(*m_temp_manager);
-                SASSERT(g->is_well_sorted());
-
-                simplify(g);
-
-                fpa2bv_rewriter_prec fpa2bv_p_rw(*m_temp_manager, fpa2bv, m_params);
-                fpa2bv_p_rw.m_cfg.set_mappings(&local_const2prec_map);
-                m_num_steps = 0;
-                unsigned size = g->size();
-                for (unsigned idx = 0; idx < size; idx++) {
-                    if (g->inconsistent())
-                        break;
-                    expr * curr = g->form(idx);
-                    fpa2bv_p_rw(curr, new_curr, new_pr);
-                    m_num_steps += fpa2bv_p_rw.get_num_steps();
-                    if (m_proofs_enabled) {
-                        proof * pr = g->pr(idx);
-                        new_pr = m_temp_manager->mk_modus_ponens(pr, new_pr);
-                    }
-                    g->update(idx, new_curr, new_pr, g->dep(idx));
-
-                    SASSERT(g->is_well_sorted());
-                }
-
-                SASSERT(g->is_well_sorted());
-
-                simplify(g);
-
-                //Bitblasting
-                TRACE("before_bit_blaster", g->display(tout););
-                m_num_steps = 0;
-                size = g->size();
-                for (unsigned idx = 0; idx < size; idx++) {
-                    if (g->inconsistent())
-                        break;
-                    expr * curr = g->form(idx);
-                    bv2bool(curr, new_curr, new_pr);
-                    m_num_steps += bv2bool.get_num_steps();
-                    if (m_proofs_enabled) {
-                        proof * pr = g->pr(idx);
-                        new_pr = m_temp_manager->mk_modus_ponens(pr, new_pr);
-                    }
-                    g->update(idx, new_curr, new_pr, g->dep(idx));
-                }
-
-                g->inc_depth();
-
-                simplify(g);
-
-                TRACE("before_sat_solver", g->display(tout););
-                g->elim_redundancies();
-
-                goal2sat::dep2asm_map d2am ;
-                m_goal2sat(*g, m_params, sat_solver, atom_map, d2am, true);
-
-                { tactic_report report_i("fpa2bv_approx_unsat_core_check_after_bitblaster", *ng); }
-
-                r = sat_solver.check();
-            }
-
-            dealloc(m_temp_manager);
-            m_temp_manager = 0;
-
+			expr_ref_vector ecl(ng->m()), out_core(ng->m());
+			lbool r = approximate_model_construction(ng, ecl, local_const2prec_map, out_core);
+		    
             return r;
 		}
         virtual void operator()(goal_ref const & g, goal_ref_buffer & result,
@@ -1622,13 +1546,24 @@ class fpa2bv_approx_tactic: public tactic {
                 } else if (r == l_false) {
 					expr_ref_vector relevant_terms(m); 
 					get_terms_from_core(mg, core_labels , out_core_labels, relevant_terms);
-					lbool isTrueCore = testCore(g,relevant_terms,const2prec_map);
-					if ( isTrueCore == l_false|| !increase_precision_from_core(mg, relevant_terms, constants, const2prec_map, const2term_map, next_const2prec_map))
+					if (!increase_precision_from_core(mg, relevant_terms, constants, const2prec_map, const2term_map, next_const2prec_map))
                     {// Refinement failed -> This is unsat.
                         solved = true;
                         result.back()->reset();
                         result.back()->assert_expr(m.mk_false());
                     }
+					else
+					{
+						lbool isTrueCore = testCore(g, relevant_terms, const2prec_map);
+						if (isTrueCore == l_false) {
+							std::cout << "Found an unsat core at full precision" << std::endl;
+
+							solved = true;
+							result.back()->reset();
+							result.back()->assert_expr(m.mk_false());
+						}
+						
+					}
                 } else {
                     // CMW: When the sat solver comes back with `unknown', what shall we do?
                     // AZ: Blindly refine?
