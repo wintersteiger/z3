@@ -51,6 +51,7 @@
 #define PREC_INCREMENT 20
 #define ERR_OP 0 //
 #define UNSAT_CORE_CHECK_THRESHOLD 0.6
+#define UNSAT_REFINEMENT_ENABLED
 
 struct pair
 {
@@ -1603,6 +1604,9 @@ class fpa2bv_approx_tactic: public tactic {
                         verify_precise_model(g,full_mdl,constants,const2term_map,mc,result);
 
                 } else if (r == l_false) {
+                    #ifndef UNSAT_REFINEMENT_ENABLED
+                    blindly_refine(constants, const2prec_map, next_const2prec_map);
+                    #else
 					expr_ref_vector relevant_terms(m); 
 					get_terms_from_core(mg, core_labels_mapping , out_core_labels, relevant_terms);
 
@@ -1644,6 +1648,7 @@ class fpa2bv_approx_tactic: public tactic {
                         next_const2prec_map.reset();
                         blindly_refine(constants,const2prec_map,next_const2prec_map);
                     }
+                    #endif
                 } else {
                     // CMW: When the sat solver comes back with `unknown', what shall we do?
                     // AZ: Blindly refine?
