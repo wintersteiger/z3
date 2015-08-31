@@ -129,11 +129,10 @@ class fpa2bv_approx_tactic: public tactic {
 			obj_map<func_decl, unsigned> & cnst2prec_map,
 			obj_map<func_decl, unsigned> & new_map)
 		{
-			return naive_proof_guided_refinement(g,cnsts_to_keep,cnst2prec_map,new_map);
+			return naive_proof_guided_refinement(cnsts_to_keep,cnst2prec_map,new_map);
 		}
 				
         bool naive_proof_guided_refinement(
-                goal_ref const & g,
                 func_decl_ref_vector const & cnsts,
                 obj_map<func_decl, unsigned> & cnst2prec_map,
                 obj_map<func_decl, unsigned> & new_map)
@@ -1601,8 +1600,12 @@ class fpa2bv_approx_tactic: public tactic {
                         verify_precise_model(g,full_mdl,constants,const2term_map,mc,result);
 
                 } else if (r == l_false) {
-                    #ifndef UNSAT_REFINEMENT_ENABLED
-                    blindly_refine(constants, const2prec_map, next_const2prec_map);
+                    #ifndef UNSAT_REFINEMENT_ENABLED                    
+                    if (!naive_proof_guided_refinement(constants, const2prec_map, next_const2prec_map)) {
+                        solved = true;
+                        result.back()->reset();
+                        result.back()->assert_expr(m.mk_false());
+                    }
                     #else
 					expr_ref_vector relevant_terms(m); 
 					get_terms_from_core(mg, core_labels_mapping , out_core_labels, relevant_terms);
