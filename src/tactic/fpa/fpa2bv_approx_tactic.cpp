@@ -1070,7 +1070,7 @@ class fpa2bv_approx_tactic: public tactic {
             SASSERT(mg->is_well_sorted());
         }
 
-        bool fully_encoded(obj_map<func_decl, unsigned> const & precision_map)
+        bool is_fully_encoded(obj_map<func_decl, unsigned> const & precision_map)
         {
             for (obj_map<func_decl, unsigned>::iterator it = precision_map.begin();
                     it != precision_map.end();
@@ -1078,6 +1078,7 @@ class fpa2bv_approx_tactic: public tactic {
                 if (it->m_value < MAX_PRECISION) return false;
             return true;
         }
+
 
         void bitblast(goal_ref const & g,
                       fpa2bv_converter_prec & fpa2bv,
@@ -1302,9 +1303,10 @@ class fpa2bv_approx_tactic: public tactic {
                          core_labels_t, core_literals);
                 { tactic_report report_i("fpa2bv_approx_after_bitblaster", *ng); }
 
-                std::cout << "Iteration variables: " << sat_solver.num_vars() << std::endl;
-                std::cout << "Iteration clauses: " << sat_solver.num_clauses() << std::endl;
+                std::cout << "Num variables: " << sat_solver.num_vars() << std::endl;
+                std::cout << "Num clauses: " << sat_solver.num_clauses() << std::endl;
 
+                //std::cout << sat_solver.num_vars() << "," << sat_solver.num_clauses();
                 // CMW: We pass the core_literals vector of assumption literals to the
                 // SAT solver; for now this is always the whole set of core labels.
                 r = sat_solver.check(core_literals.size(), core_literals.c_ptr());
@@ -1452,34 +1454,37 @@ class fpa2bv_approx_tactic: public tactic {
 		    }
 
 			expr_ref_vector ecl(ng->m()), out_core(ng->m());
+#ifdef Z3DEBUG
 			std::cout << "Test core:" <<std::endl;
 			std::cout << "Goal size: " << ng->size() << std::endl;
 			ng->display(std::cout);
+#endif
+
 			lbool r = approximate_model_construction(ng, ecl, local_const2prec_map, out_core);
 		    
             return r;
 		}
 
-		bool seen_core( std::vector<std::vector<expr*>*> & seen, expr_ref_vector & core){
+		bool seen_core( vector<expr_ref_vector> & seen, expr_ref_vector & core){
 		    bool is_found = false;
 
 		    int found_cnt = 0;
-		    std::vector<expr*>* cur;
+
 		    expr * from_core;
 
 		    for (unsigned i = 0; i < seen.size() && !is_found; i++){
 		        found_cnt = 0;
-		        cur = seen[i];
+		        expr_ref_vector & cur = seen.get(i);
 		        for (unsigned j = 0; j < core.size(); j++){
 		            from_core = core.get(j);
-		            for (unsigned k =0 ; k < cur->size(); k++){
-		                if ( from_core == (*cur)[k]){
+		            for (unsigned k =0 ; k < cur.size(); k++){
+		                if ( from_core == cur.get(k)){
 		                    found_cnt++;
 		                    break;
 		                }
 		            }
 		        }
-		        if (found_cnt == cur->size()){
+		        if (found_cnt == core.size()){
 		            is_found = true;
 		        }
 		    }
@@ -1536,13 +1541,15 @@ class fpa2bv_approx_tactic: public tactic {
                 core_labels.push_back(core_label);
             }
 
-            std::vector<std::vector<expr*>*> seen_cores;
+
+            vector<expr_ref_vector> seen_cores;
 
 
             while (!solved && !m_cancel)
             {
+                iteration_cnt ++;
 
-                std::cout << "=============== Starting iteration " << ++iteration_cnt << std::endl;
+                std::cout << "=============== Starting iteration " << iteration_cnt << std::endl;
 
                 sw.reset();
                 sw.start();
@@ -1565,7 +1572,9 @@ class fpa2bv_approx_tactic: public tactic {
 
                 TRACE("fpa2bv_approx_goal_i", mg->display(tout); );
 
+                //std::cout<< iteration_cnt << ",";
 				r = approximate_model_construction(mg, core_labels, const2prec_map, out_core_labels);
+				//std::cout << (r==l_true?"SAT,":r==l_false?"UNSAT,":"UNKNOWN,");
 
                 std::cout << "Approximation is " << (r==l_true?"SAT":r==l_false?"UNSAT":"UNKNOWN") << std::endl;
 
@@ -1573,7 +1582,7 @@ class fpa2bv_approx_tactic: public tactic {
                     model_ref full_mdl = alloc(model, m);
                     obj_map<expr, double> err_est;
 
-                    if (fully_encoded(const2prec_map)) {
+                    if (is_fully_encoded(const2prec_map)) {
                         full_mdl = m_fpa_model;
                         solved = true;
 #ifdef Z3DEBUG
@@ -1596,38 +1605,43 @@ class fpa2bv_approx_tactic: public tactic {
                 } else if (r == l_false) {
 					expr_ref_vector relevant_terms(m); 
 					get_terms_from_core(mg, core_labels_mapping , out_core_labels, relevant_terms);
-		            std::cout << "Core size: " << out_core_labels.size() << "/ "<< mg->size() << std::endl;
-					if (fully_encoded(const2prec_map)) //if (!
+
+					std::cout << "Core size: " << out_core_labels.size() << "/"<< mg->size() << std::endl;
+
+
+					if (!increase_precision_from_core(mg, relevant_terms, constants, const2prec_map, const2term_map, next_const2prec_map))
 					{// Refinement failed -> This is unsat.
                         solved = true;
                         result.back()->reset();
                         result.back()->assert_expr(m.mk_false());
-                    }
-					else if (//out_core_labels.size() / (mg->size() + 0.0) <= UNSAT_CORE_CHECK_THRESHOLD &&
-					         !seen_core(seen_cores, out_core_labels)){
-					    std::cout << "Time pre unsat check: " << sw.get_current_seconds() << std::endl;
-						lbool isTrueCore = testCore(g, relevant_terms, const2prec_map);
 
-						if (isTrueCore == l_false || !increase_precision_from_core(mg, relevant_terms, constants, const2prec_map, const2term_map, next_const2prec_map)) {
 
-						    if (isTrueCore == l_false){
-						        std::cout << "Found an unsat core at full precision" << std::endl;
-						    }
+                     }
+					else if (!seen_core(seen_cores, out_core_labels)){
+
+					    std::cout << "Approximation solving time: " << sw.get_current_seconds() << std::endl;
+
+
+					    lbool is_core_sat = testCore(g, relevant_terms, const2prec_map);
+
+						if (is_core_sat == l_false) {
+
+//						    if (is_core_sat == l_false){
+//						        std::cout << "Found an unsat core at full precision" << std::endl;
+//						    }
 
 							solved = true;
 							result.back()->reset();
 							result.back()->assert_expr(m.mk_false());
 						}
 						else{
-						    std::vector<expr*> * p_core = new std::vector<expr*>();
-						    for (unsigned i = 0; i < out_core_labels.size(); i++){
-						        p_core->push_back(out_core_labels.get(i));
-						    }
+						    expr_ref_vector p_core(out_core_labels);
 						    seen_cores.push_back(p_core);
-						    blindly_refine(constants,const2prec_map,next_const2prec_map);
+						    //precision increase by the core is done already
 						}
 					}
                     else {
+                        next_const2prec_map.reset();
                         blindly_refine(constants,const2prec_map,next_const2prec_map);
                     }
                 } else {
@@ -1641,13 +1655,12 @@ class fpa2bv_approx_tactic: public tactic {
 
                 std::cout << "Iteration time: " << sw.get_current_seconds() << std::endl;
 
+                std::cout << sw.get_current_seconds() << std::endl;
             }
 
             std::cout << "=============== Terminating " << std::endl;          
             std::cout << "Iteration count: " << iteration_cnt << std::endl;
-            for (unsigned i = 0; i <  seen_cores.size(); i++){
-                delete seen_cores[i];
-            }
+
 	    dec_ref_map_key_values(m, const2term_map);
         }
     };
