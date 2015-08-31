@@ -50,6 +50,7 @@
 #define K_PERCENTAGE 0.3
 #define PREC_INCREMENT 20
 #define ERR_OP 0 //
+#define UNSAT_CORE_CHECK_THRESHOLD 0.6
 
 struct pair
 {
@@ -861,7 +862,7 @@ class fpa2bv_approx_tactic: public tactic {
 				new_prec += cnst2prec_map.find(f);
 
 			if (new_prec < MAX_PRECISION){
-			  new_prec += (isSat)? PREC_INCREMENT : MAX_PRECISION;
+			  new_prec += PREC_INCREMENT;//(isSat)? PREC_INCREMENT : MAX_PRECISION;
                 new_prec = (new_prec > MAX_PRECISION) ? MAX_PRECISION : new_prec;
                 new_map.insert(f, new_prec);
                 res = true;
@@ -907,6 +908,21 @@ class fpa2bv_approx_tactic: public tactic {
 			return res;
 		}
 
+		void blindly_refine(
+		    func_decl_ref_vector const & cnsts,
+            obj_map<func_decl, unsigned> & cnst2prec_map,
+            obj_map<func_decl, unsigned> & new_map){
+		    func_decl * f;
+            unsigned prec = 0;
+            for (unsigned j = 0; j<cnsts.size(); j++){
+                f = cnsts.get(j);
+                prec = cnst2prec_map.find(f);
+                prec += PREC_INCREMENT;
+                prec = (prec > MAX_PRECISION) ? MAX_PRECISION : prec;
+                new_map.insert(f, prec);
+            }
+		}
+
 		// If new_map is empty, increments precision of all constants
 		// otherwise copies the missing precision values
 		void complete_precision_map(
@@ -923,17 +939,10 @@ class fpa2bv_approx_tactic: public tactic {
 				
 			}
 			else { //No precision was increased then we increase all of them
-				func_decl * f;
-				unsigned prec = 0;
-				for (unsigned j = 0; j<cnsts.size(); j++){
-					f = cnsts.get(j);
-					prec = cnst2prec_map.find(f);
-					prec += PREC_INCREMENT;
-					prec = (prec > MAX_PRECISION) ? MAX_PRECISION : prec;
-					new_map.insert(f, prec);
-				}
-			}
-		}
+				    blindly_refine(cnsts,cnst2prec_map,new_map);
+            }
+        }
+
 
 
         void increase_precision_by_rank(
@@ -970,22 +979,22 @@ class fpa2bv_approx_tactic: public tactic {
 			//Refine chosen terms and find the any input 'variables' which are
 			//its immediate arguments and refine them as well
 
-
-			std::cout << "Core size: " << from_core.size() << "/ "<< mg->size() << std::endl;
+            expr_ref_vector queue(mg->m());
 			for (unsigned i = 0; i < from_core.size(); i ++) {
 			    app * to_refine = to_app(from_core.get(i));
+			    queue.push_back(to_refine);
 			    //std::cout << mk_ismt2_pp(to_refine,m) << std::endl;
 			}
 			bool updated = false;
-			for (unsigned i = 0; i < from_core.size(); i ++) {
-			    app * to_refine = to_app(from_core.get(i));
+			for (unsigned i = 0; i < queue.size(); i ++) {
+			    app * to_refine = to_app(queue.get(i));
 			    //std::cout << "Attempting: " << mk_ismt2_pp(to_refine,m) << std::endl;
 			            //<< ":" << cnst2prec_map.find(to_refine->get_decl())
 			    if (cnsts.contains(to_refine->get_decl()))
 			      updated |= increase_term_precision(to_refine, false, cnsts, cnst2prec_map, cnst2term_map, new_map);
 			    else
 			        for (unsigned j=0; j < to_refine->get_num_args(); j++)
-			            from_core.push_back(to_refine->get_arg(j));
+			            queue.push_back(to_refine->get_arg(j));
 
 			}
 			
@@ -1420,12 +1429,9 @@ class fpa2bv_approx_tactic: public tactic {
 #endif
         }
 
-		void get_terms_from_core(goal_ref mg, expr_ref_vector & core_labels, expr_ref_vector & core_lits, expr_ref_vector & out_relevant_constants){
-			for (unsigned i = 0; i < mg->size(); i++) {
-				app * c = to_app(mg->form(i));
-				if (c->get_decl_kind() == OP_IMPLIES && core_lits.contains(c->get_arg(0))){
-					out_relevant_constants.push_back(c->get_arg(1));
-				}				
+		void get_terms_from_core(goal_ref mg, obj_map<expr,expr*> & core_map, expr_ref_vector & core_lits, expr_ref_vector & out_relevant_constants){
+			for (unsigned i = 0; i < core_lits.size(); i++) {
+				out_relevant_constants.push_back(core_map.find(core_lits.get(i)));
 			}
 		}
 
@@ -1446,9 +1452,38 @@ class fpa2bv_approx_tactic: public tactic {
 		    }
 
 			expr_ref_vector ecl(ng->m()), out_core(ng->m());
+			std::cout << "Test core:" <<std::endl;
+			std::cout << "Goal size: " << ng->size() << std::endl;
+			ng->display(std::cout);
 			lbool r = approximate_model_construction(ng, ecl, local_const2prec_map, out_core);
 		    
             return r;
+		}
+
+		bool seen_core( std::vector<std::vector<expr*>*> & seen, expr_ref_vector & core){
+		    bool is_found = false;
+
+		    int found_cnt = 0;
+		    std::vector<expr*>* cur;
+		    expr * from_core;
+
+		    for (unsigned i = 0; i < seen.size() && !is_found; i++){
+		        found_cnt = 0;
+		        cur = seen[i];
+		        for (unsigned j = 0; j < core.size(); j++){
+		            from_core = core.get(j);
+		            for (unsigned k =0 ; k < cur->size(); k++){
+		                if ( from_core == (*cur)[k]){
+		                    found_cnt++;
+		                    break;
+		                }
+		            }
+		        }
+		        if (found_cnt == cur->size()){
+		            is_found = true;
+		        }
+		    }
+		    return is_found;
 		}
         virtual void operator()(goal_ref const & g, goal_ref_buffer & result,
                                 model_converter_ref & mc, proof_converter_ref & pc,
@@ -1482,6 +1517,28 @@ class fpa2bv_approx_tactic: public tactic {
             std::cout << "Simplified goal:" << std::endl;
             g->display(std::cout);
 #endif
+
+            // CMW: We need "labels" associated with each constraint. Later, the
+            // unsat cores will be presented to us in the form of these labels. Each
+            // label is a Boolean variable that implies the constraint and we will then
+            // pass an "assumption" to the solver that asserts that the literal must
+            // be true. So, the semantics are not changed, but now we have "variable
+            // names" associated with the constraint.
+            // Later, this will also allow us to retract some (but not all) of the
+            // constraints by assuming those labels to be false.
+
+            expr_ref_vector core_labels(g->m());
+            obj_map<expr,expr*> core_labels_mapping;
+            for (unsigned i = 0; i < g->size(); i++) {
+                expr_ref core_label(g->m());
+                core_label = g->m().mk_fresh_const("fpa2bv_approx_core_label", g->m().mk_bool_sort());
+                core_labels_mapping.insert(core_label, g->form(i));
+                core_labels.push_back(core_label);
+            }
+
+            std::vector<std::vector<expr*>*> seen_cores;
+
+
             while (!solved && !m_cancel)
             {
 
@@ -1493,22 +1550,15 @@ class fpa2bv_approx_tactic: public tactic {
                 // Copy the goal
                 goal_ref  mg(alloc(goal, g->m(), g->proofs_enabled(), true, true));
                 
-                // CMW: We need "labels" associated with each constraint. Later, the 
-                // unsat cores will be presented to us in the form of these labels. Each
-                // label is a Boolean variable that implies the constraint and we will then
-                // pass an "assumption" to the solver that asserts that the literal must 
-                // be true. So, the semantics are not changed, but now we have "variable
-                // names" associated with the constraint.
-                // Later, this will also allow us to retract some (but not all) of the 
-                // constraints by assuming those labels to be false.
-                expr_ref_vector core_labels(g->m());
+                // Assert the labeled constraints
                 expr_ref_vector out_core_labels(g->m());
-                for (unsigned i = 0; i < g->size(); i++) {
-                    expr_ref core_label(g->m());
-                    core_label = g->m().mk_fresh_const("fpa2bv_approx_core_label", g->m().mk_bool_sort());
-                    core_labels.push_back(core_label);
-                    mg->assert_expr(g->m().mk_implies(core_label, g->form(i)));
+
+                for(obj_map<expr,expr*>::iterator it = core_labels_mapping.begin();
+                    it != core_labels_mapping.end();
+                    it ++){
+                    mg->assert_expr(g->m().mk_implies(it->m_key,it->m_value));
                 }
+
                 tactic_report report_i("fpa2bv_approx_i", *mg);
 
                 //print_constants(constants, const2prec_map);
@@ -1545,25 +1595,41 @@ class fpa2bv_approx_tactic: public tactic {
 
                 } else if (r == l_false) {
 					expr_ref_vector relevant_terms(m); 
-					get_terms_from_core(mg, core_labels , out_core_labels, relevant_terms);
-					if (!increase_precision_from_core(mg, relevant_terms, constants, const2prec_map, const2term_map, next_const2prec_map))
-                    {// Refinement failed -> This is unsat.
+					get_terms_from_core(mg, core_labels_mapping , out_core_labels, relevant_terms);
+		            std::cout << "Core size: " << out_core_labels.size() << "/ "<< mg->size() << std::endl;
+					if (fully_encoded(const2prec_map)) //if (!
+					{// Refinement failed -> This is unsat.
                         solved = true;
                         result.back()->reset();
                         result.back()->assert_expr(m.mk_false());
                     }
-					else
-					{
+					else if (//out_core_labels.size() / (mg->size() + 0.0) <= UNSAT_CORE_CHECK_THRESHOLD &&
+					         !seen_core(seen_cores, out_core_labels)){
+					    std::cout << "Time pre unsat check: " << sw.get_current_seconds() << std::endl;
 						lbool isTrueCore = testCore(g, relevant_terms, const2prec_map);
-						if (isTrueCore == l_false) {
-							std::cout << "Found an unsat core at full precision" << std::endl;
+
+						if (isTrueCore == l_false || !increase_precision_from_core(mg, relevant_terms, constants, const2prec_map, const2term_map, next_const2prec_map)) {
+
+						    if (isTrueCore == l_false){
+						        std::cout << "Found an unsat core at full precision" << std::endl;
+						    }
 
 							solved = true;
 							result.back()->reset();
 							result.back()->assert_expr(m.mk_false());
 						}
-						
+						else{
+						    std::vector<expr*> * p_core = new std::vector<expr*>();
+						    for (unsigned i = 0; i < out_core_labels.size(); i++){
+						        p_core->push_back(out_core_labels.get(i));
+						    }
+						    seen_cores.push_back(p_core);
+						    blindly_refine(constants,const2prec_map,next_const2prec_map);
+						}
 					}
+                    else {
+                        blindly_refine(constants,const2prec_map,next_const2prec_map);
+                    }
                 } else {
                     // CMW: When the sat solver comes back with `unknown', what shall we do?
                     // AZ: Blindly refine?
@@ -1579,7 +1645,9 @@ class fpa2bv_approx_tactic: public tactic {
 
             std::cout << "=============== Terminating " << std::endl;          
             std::cout << "Iteration count: " << iteration_cnt << std::endl;
-
+            for (unsigned i = 0; i <  seen_cores.size(); i++){
+                delete seen_cores[i];
+            }
 	    dec_ref_map_key_values(m, const2term_map);
         }
     };
