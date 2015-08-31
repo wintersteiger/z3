@@ -42,9 +42,6 @@
 #include"filter_model_converter.h"
 #include <list>
 #include <queue>
-#include <math.h>
-
-#include<iostream>
 
 #define K_MIN 10
 #define K_PERCENTAGE 0.3
