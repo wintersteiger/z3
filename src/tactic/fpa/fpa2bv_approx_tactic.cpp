@@ -42,7 +42,7 @@
 #include"filter_model_converter.h"
 #include <list>
 #include <queue>
-
+#include <math.h>
 #define K_MIN 10
 #define K_PERCENTAGE 0.3
 #define PREC_INCREMENT 20
@@ -1541,7 +1541,7 @@ class fpa2bv_approx_tactic: public tactic {
 
             vector<expr_ref_vector> seen_cores;
 
-
+	    
             while (!solved && !m_cancel)
             {
                 iteration_cnt ++;
@@ -1615,12 +1615,10 @@ class fpa2bv_approx_tactic: public tactic {
 
 					if (!increase_precision_from_core(mg, relevant_terms, constants, const2prec_map, const2term_map, next_const2prec_map))
 					{// Refinement failed -> This is unsat.
-                        solved = true;
-                        result.back()->reset();
-                        result.back()->assert_expr(m.mk_false());
-
-
-                     }
+					  solved = true;
+					  result.back()->reset();
+					  result.back()->assert_expr(m.mk_false());
+					}
 					else if (!seen_core(seen_cores, out_core_labels)){
 
 					    std::cout << "Approximation solving time: " << sw.get_current_seconds() << std::endl;
@@ -1642,6 +1640,8 @@ class fpa2bv_approx_tactic: public tactic {
 						    expr_ref_vector p_core(out_core_labels);
 						    seen_cores.push_back(p_core);
 						    //precision increase by the core is done already
+						    //next_const2prec_map.reset();
+						    //blindly_refine(constants,const2prec_map,next_const2prec_map);
 						}
 					}
                     else {
@@ -1659,8 +1659,6 @@ class fpa2bv_approx_tactic: public tactic {
                 next_const2prec_map.reset();
 
                 std::cout << "Iteration time: " << sw.get_current_seconds() << std::endl;
-
-                std::cout << sw.get_current_seconds() << std::endl;
             }
 
             std::cout << "=============== Terminating " << std::endl;          
