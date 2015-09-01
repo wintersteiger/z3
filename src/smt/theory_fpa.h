@@ -22,6 +22,7 @@ Revision History:
 #include"smt_theory.h"
 #include"trail.h"
 #include"fpa2bv_converter.h"
+#include"rewriter_def.h"
 #include"fpa2bv_rewriter.h"
 #include"th_rewriter.h"
 #include"value_factory.h"
