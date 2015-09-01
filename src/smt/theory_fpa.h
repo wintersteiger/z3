@@ -22,6 +22,7 @@ Revision History:
 #include"smt_theory.h"
 #include"trail.h"
 #include"fpa2bv_converter.h"
+#include"rewriter_def.h"
 #include"fpa2bv_rewriter.h"
 #include"th_rewriter.h"
 #include"value_factory.h"
@@ -83,6 +84,7 @@ namespace smt {
             virtual ~fpa2bv_converter_wrapped() {}
             virtual void mk_const(func_decl * f, expr_ref & result);
             virtual void mk_rm_const(func_decl * f, expr_ref & result);
+            virtual void mk_uninterpreted_function(func_decl * f, unsigned num, expr * const * args, expr_ref & result);
         };
         
         class fpa_value_proc : public model_value_proc {
