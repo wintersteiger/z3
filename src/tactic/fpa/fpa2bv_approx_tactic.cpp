@@ -1529,7 +1529,9 @@ class fpa2bv_approx_tactic: public tactic {
             // Later, this will also allow us to retract some (but not all) of the
             // constraints by assuming those labels to be false.
 
-            expr_ref_vector core_labels(g->m());
+            expr_ref_vector core_labels(m);            
+            
+#ifdef UNSAT_REFINEMENT_ENABLED
             obj_map<expr,expr*> core_labels_mapping;
             for (unsigned i = 0; i < g->size(); i++) {
                 expr_ref core_label(g->m());
@@ -1537,7 +1539,7 @@ class fpa2bv_approx_tactic: public tactic {
                 core_labels_mapping.insert(core_label, g->form(i));
                 core_labels.push_back(core_label);
             }
-
+#endif
 
             vector<expr_ref_vector> seen_cores;
 
@@ -1551,17 +1553,21 @@ class fpa2bv_approx_tactic: public tactic {
                 sw.reset();
                 sw.start();
 
-                // Copy the goal
-                goal_ref  mg(alloc(goal, g->m(), g->proofs_enabled(), true, true));
-                
+                // Copy the goal, introduce core labels if needed.
+
+                #ifdef UNSAT_REFINEMENT_ENABLED
+                    goal_ref mg(alloc(goal, g->m(), g->proofs_enabled(), true, true));
+                    for(obj_map<expr,expr*>::iterator it = core_labels_mapping.begin();
+                        it != core_labels_mapping.end();
+                        it ++)
+                        mg->assert_expr(g->m().mk_implies(it->m_key, it->m_value));
+                #else
+                    goal_ref  mg(alloc(goal, g->m(), g->proofs_enabled(), true, false));
+                    mg->copy_from(*g);
+                #endif
+
                 // Assert the labeled constraints
                 expr_ref_vector out_core_labels(g->m());
-
-                for(obj_map<expr,expr*>::iterator it = core_labels_mapping.begin();
-                    it != core_labels_mapping.end();
-                    it ++){
-                    mg->assert_expr(g->m().mk_implies(it->m_key,it->m_value));
-                }
 
                 tactic_report report_i("fpa2bv_approx_i", *mg);
 
@@ -1589,10 +1595,9 @@ class fpa2bv_approx_tactic: public tactic {
                     }
                     else {
                         solved = precise_model_reconstruction(m_fpa_model, full_mdl, mg, err_est, constants, const2term_map);
-#ifdef Z3DEBUG
+
                         std::cout<<"Patching of the model "<<((solved)?"succeeded":"failed")<<std::endl;
                         std::cout.flush();
-#endif
                     }
                     if (!solved)
                         model_guided_approximation_refinement(m_fpa_model, full_mdl, mg, constants, const2prec_map, const2term_map, err_est, next_const2prec_map);
