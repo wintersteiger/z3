@@ -226,13 +226,19 @@ class fpa2bv_approx_tactic: public tactic {
         }
 
         //Equality as assignment?
-        void fix_cnst2cnst_equalities(goal_ref const & g,model_ref & full_mdl) {
+      void fix_cnst2cnst_equalities(goal_ref const & g,model_ref & full_mdl, expr_ref_vector & core_labels) {
             app * eq;
 #ifdef Z3DEBUG
             std::cout<<"Fixing trivial equalities"<<std::endl;
 #endif
             for (unsigned i=0; i<g->size();i++) {
                 eq = to_app(g->form(i));
+		
+		if (eq->get_family_id() == m.get_basic_family_id() &&
+		    eq->get_decl_kind() == OP_IMPLIES &&
+		    core_labels.contains(eq->get_arg(0))){
+		  eq = to_app(eq->get_arg(1));
+		}
 
                 if (eq->get_family_id() == m.get_basic_family_id() &&
                         eq->get_decl_kind() == OP_EQ){
@@ -703,7 +709,8 @@ class fpa2bv_approx_tactic: public tactic {
                 goal_ref const & g,
                 obj_map<expr, double> & err_est,//mpf*
                 func_decl_ref_vector const & cnsts,
-                obj_map<func_decl, app*> & cnst2term_map) {
+                obj_map<func_decl, app*> & cnst2term_map,
+		expr_ref_vector & core_labels) {
 #ifdef Z3DEBUG
             std::cout << "Attempting to patch small-float model" << std::endl;
 #endif
@@ -725,7 +732,7 @@ class fpa2bv_approx_tactic: public tactic {
             std::cout.flush();
 #endif
             //Assigning values when input_cnst = intro_cnst;
-            fix_cnst2cnst_equalities(g,full_mdl);
+            fix_cnst2cnst_equalities(g,full_mdl,core_labels);
 
             //Completing the model with values for input variables
             for (unsigned j=0; j < mdl->get_num_constants(); j++) {
@@ -1236,7 +1243,7 @@ class fpa2bv_approx_tactic: public tactic {
 			ast_translation translator(*m_temp_manager, this->m);
 			for (unsigned i = 0; i < core.size(); i++) {
                 sat::literal l = core[i];
-                int v = l.var();
+                unsigned v = l.var();
                 bool found = false;
                 expr * e_tm;
                 for (atom2bool_var::iterator it = atom_map.begin();
@@ -1465,7 +1472,7 @@ class fpa2bv_approx_tactic: public tactic {
 		bool seen_core( vector<expr_ref_vector> & seen, expr_ref_vector & core){
 		    bool is_found = false;
 
-		    int found_cnt = 0;
+		    unsigned found_cnt = 0;
 
 		    expr * from_core;
 
@@ -1543,7 +1550,7 @@ class fpa2bv_approx_tactic: public tactic {
 
             vector<expr_ref_vector> seen_cores;
 
-	    
+	    double time_stamp;
             while (!solved && !m_cancel)
             {
                 iteration_cnt ++;
@@ -1595,9 +1602,10 @@ class fpa2bv_approx_tactic: public tactic {
                     }
                     else {
                         solved = precise_model_reconstruction(m_fpa_model, full_mdl, mg, err_est, constants, const2term_map);
-
+#ifdef Z3DEBUG
                         std::cout<<"Patching of the model "<<((solved)?"succeeded":"failed")<<std::endl;
                         std::cout.flush();
+#endif
                     }
                     if (!solved)
                         model_guided_approximation_refinement(m_fpa_model, full_mdl, mg, constants, const2prec_map, const2term_map, err_est, next_const2prec_map);
@@ -1626,7 +1634,7 @@ class fpa2bv_approx_tactic: public tactic {
 					}
 					else if (!seen_core(seen_cores, out_core_labels)){
 
-					    std::cout << "Approximation solving time: " << sw.get_current_seconds() << std::endl;
+					  std::cout << "Approximation solving time: " << (time_stamp = sw.get_current_seconds()) << std::endl;
 
 
 					    lbool is_core_sat = testCore(g, relevant_terms, const2prec_map);
@@ -1644,16 +1652,17 @@ class fpa2bv_approx_tactic: public tactic {
 						else{
 						    expr_ref_vector p_core(out_core_labels);
 						    seen_cores.push_back(p_core);
-						    //precision increase by the core is done already
-						    //next_const2prec_map.reset();
-						    //blindly_refine(constants,const2prec_map,next_const2prec_map);
+						    next_const2prec_map.reset();
+						    blindly_refine(constants,const2prec_map,next_const2prec_map);
 						}
 					}
                     else {
                         next_const2prec_map.reset();
                         blindly_refine(constants,const2prec_map,next_const2prec_map);
                     }
+		    std::cout << "Unsat core check time:" << (sw.get_current_seconds() - time_stamp) << std::endl;
                     #endif
+					
                 } else {
                     // CMW: When the sat solver comes back with `unknown', what shall we do?
                     // AZ: Blindly refine?
@@ -1662,7 +1671,7 @@ class fpa2bv_approx_tactic: public tactic {
 
                 const2prec_map.swap(next_const2prec_map);
                 next_const2prec_map.reset();
-
+		
                 std::cout << "Iteration time: " << sw.get_current_seconds() << std::endl;
             }
 
