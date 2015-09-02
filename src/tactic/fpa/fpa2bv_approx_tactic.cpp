@@ -1494,6 +1494,123 @@ class fpa2bv_approx_tactic: public tactic {
 		    }
 		    return is_found;
 		}
+
+		void insert_dependency (obj_map<func_decl,func_decl_ref_vector*> & dependencies, func_decl * dependant, func_decl * depends_on ){
+		    func_decl_ref_vector *  dep_set = dependencies.find(dependant);
+
+		    dep_set->push_back(depends_on);
+
+		    for (obj_map<func_decl,func_decl_ref_vector*>::iterator it = dependencies.begin();
+                    it != dependencies.end();
+                    it++){
+                if (it->m_value->contains(dependant)){
+                    it->m_value->push_back(depends_on);
+                }
+            }
+
+		}
+		void build_dependencies(goal_ref const & g, obj_map<func_decl,func_decl_ref_vector*> & dependencies){
+		    expr_ref_vector q(g->m());
+		    func_decl_ref_vector * dep_set;
+
+		    //Queue the goal
+            for (unsigned i = 0; i < g->size(); i++){
+                q.push_back(g->form(i));
+            }
+
+            //Building dependencies
+            for (unsigned i = 0; i < q.size(); i++){
+                app * cur = to_app(q.get(i));
+
+                if (cur->get_family_id() == g->m().get_basic_family_id() &&
+                    cur->get_decl_kind() == OP_EQ){
+                    //std::cout << mk_ismt2_pp(cur, g->m()) << std::endl;
+                    for (unsigned j = 0; j < 2; j++){
+                        app * lhs = to_app(cur->get_arg(j)); //one side
+                        app * rhs = to_app(cur->get_arg(1-j)); // other side
+
+
+                        if (lhs->get_num_args() == 0 && dependencies.contains(lhs->get_decl())) {
+                            dep_set = dependencies.find(lhs->get_decl());
+                            if(rhs->get_num_args() == 0 && dependencies.contains(rhs->get_decl()) ){
+                                //lhs = rhs
+                                insert_dependency(dependencies, lhs->get_decl(), rhs->get_decl());
+                                //dep_set->push_back(rhs->get_decl());
+                            }
+                            else{
+                                // lhs = operation  desc0 desc1 ... descn
+                                for(unsigned k = 0; k < rhs->get_num_args(); k++){
+                                    app * desc = to_app(rhs->get_arg(k));
+                                    if (dependencies.contains(desc->get_decl())){
+                                        SASSERT(desc->get_num_args() == 0);
+                                        insert_dependency(dependencies, lhs->get_decl(), desc->get_decl());
+                                        //dep_set->push_back(desc->get_decl());
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+
+                }
+                else {
+                    for (unsigned j = 0; j < cur->get_num_args(); j++){
+                        q.push_back(cur->get_arg(j));
+                    }
+                }
+            }
+		}
+
+		func_decl* find_least_dependent(obj_map<func_decl,func_decl_ref_vector*> & dependencies){
+		    unsigned  min_size = dependencies.begin()->m_value->size();
+		    func_decl * min_el = dependencies.begin()->m_key;
+
+		    unsigned current_size;
+		    for (obj_map<func_decl,func_decl_ref_vector*>::iterator it = dependencies.begin();
+		            it != dependencies.end();
+		            it++){
+		        current_size = it->m_value->size();
+		        if (current_size < min_size){
+		            min_el = it->m_key;
+		            min_size = current_size;
+		        }
+		    }
+		    return min_el;
+		}
+
+		void shrink_dependencies(obj_map<func_decl,func_decl_ref_vector*> & dependencies, func_decl * to_remove){
+		    func_decl_ref_vector * dep_set;
+            for (obj_map<func_decl,func_decl_ref_vector*>::iterator it = dependencies.begin();
+                    it != dependencies.end();
+                    it++){
+                dep_set = it->m_value;
+                dep_set->erase(to_remove);
+            }
+            dependencies.erase(to_remove);
+        }
+
+		func_decl_ref_vector * topological_sort(goal_ref const & g, func_decl_ref_vector & constants){
+		    func_decl_ref_vector * order = alloc(func_decl_ref_vector,g->m());
+		    func_decl_ref_vector * dep_set;
+		    obj_map<func_decl,func_decl_ref_vector*> dependencies;
+
+
+		    //Allocation of dependency_sets
+		    for (unsigned i = 0; i < constants.size(); i++){
+		        dep_set = alloc(func_decl_ref_vector,g->m());
+		        dependencies.insert(constants.get(i), dep_set);
+		    }
+
+		    build_dependencies(g,dependencies);
+
+		    while (dependencies.size() > 0){
+		        func_decl * min_el = find_least_dependent(dependencies);
+		        order->push_back(min_el);
+		        shrink_dependencies(dependencies, min_el);
+		    }
+		    return order;
+		}
+
         virtual void operator()(goal_ref const & g, goal_ref_buffer & result,
                                 model_converter_ref & mc, proof_converter_ref & pc,
                                 expr_dependency_ref & core) {
@@ -1526,6 +1643,20 @@ class fpa2bv_approx_tactic: public tactic {
             std::cout << "Simplified goal:" << std::endl;
             g->display(std::cout);
 #endif
+
+            func_decl_ref_vector * top_order = topological_sort(g, constants);
+            std::cout << "Topological order" << std::endl;
+            for (unsigned i = 0; i < top_order->size(); i++){
+                func_decl * cur = top_order->get(i);
+                if (const2term_map.contains(cur)){
+                    std::cout << mk_ismt2_pp(cur,g->m()) << "=" <<
+                            mk_ismt2_pp(const2term_map.find(cur),g->m()) << std::ends;
+                }
+                else{
+                    std::cout << mk_ismt2_pp(cur,g->m()) << std::endl;
+                }
+            }
+
 
             // CMW: We need "labels" associated with each constraint. Later, the
             // unsat cores will be presented to us in the form of these labels. Each
