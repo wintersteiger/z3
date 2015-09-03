@@ -1723,7 +1723,7 @@ class fpa2bv_approx_tactic: public tactic {
 		    build_dependencies(g,dependencies,const2term);
 
 #ifdef Z3DEBUG
-		    std::cout<< "Dependency map" <<std:::endl;
+		    std::cout<< "Dependency map" <<std::endl;
 		    for (obj_map<func_decl,func_decl_ref_vector*>::iterator it = dependencies.begin();
                                 it != dependencies.end();
                                 it++){
