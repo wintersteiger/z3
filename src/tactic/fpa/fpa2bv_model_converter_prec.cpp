@@ -167,6 +167,8 @@ void fpa2bv_model_converter_prec::convert(model * bv_mdl, model * float_mdl) {
         mpzm.del(sig_z);
     }
 
+    fu.fm().del(fp_val);
+
     for (obj_map<func_decl, expr*>::iterator it = m_rm_const2bv.begin();
          it != m_rm_const2bv.end();
          it++)
@@ -206,9 +208,7 @@ void fpa2bv_model_converter_prec::convert(model * bv_mdl, model * float_mdl) {
         seen.insert(it->m_value.f_sgn);
         seen.insert(it->m_value.f_sig);
         seen.insert(it->m_value.f_exp);
-    }
-
-    fu.fm().del(fp_val);
+    }    
 
     // Keep all the non-float constants.
     unsigned sz = bv_mdl->get_num_constants();
@@ -217,7 +217,7 @@ void fpa2bv_model_converter_prec::convert(model * bv_mdl, model * float_mdl) {
         func_decl * c = bv_mdl->get_constant(i);
         if (!seen.contains(c))
             float_mdl->register_decl(c, bv_mdl->get_const_interp(c));
-    }
+    }    
 
     // And keep everything else
     sz = bv_mdl->get_num_functions();

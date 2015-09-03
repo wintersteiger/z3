@@ -86,7 +86,7 @@ void fpa2bv_converter_prec::mk_const(func_decl * f, unsigned prec, expr_ref & re
                 //parameter parameters[2] = { parameter(ebits), parameter(sbits) };
 
                 fpa2bv_converter::mk_const(small_const->get_decl(), result);
-                m_const2bv.insert(f, result.get());
+                m_const2bv.insert(f, result.get());                
                 m.inc_ref(f);
                 m.inc_ref(result.get());
 #ifdef Z3DEBUG
