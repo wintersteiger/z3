@@ -122,16 +122,16 @@ class fpa2bv_approx_tactic: public tactic {
         }
 
 
-		bool proof_guided_refinement(
-			goal_ref const & g,
-			func_decl_ref_vector const & cnsts_to_increment,
-			func_decl_ref_vector const & cnsts_to_keep,
-			obj_map<func_decl, unsigned> & cnst2prec_map,
-			obj_map<func_decl, unsigned> & new_map)
-		{
-			return naive_proof_guided_refinement(cnsts_to_keep,cnst2prec_map,new_map);
-		}
-				
+        bool proof_guided_refinement(
+            goal_ref const & g,
+            func_decl_ref_vector const & cnsts_to_increment,
+            func_decl_ref_vector const & cnsts_to_keep,
+            obj_map<func_decl, unsigned> & cnst2prec_map,
+            obj_map<func_decl, unsigned> & new_map)
+        {
+            return naive_proof_guided_refinement(cnsts_to_keep,cnst2prec_map,new_map);
+        }
+                
         bool naive_proof_guided_refinement(
                 func_decl_ref_vector const & cnsts,
                 obj_map<func_decl, unsigned> & cnst2prec_map,
@@ -233,12 +233,12 @@ class fpa2bv_approx_tactic: public tactic {
 #endif
             for (unsigned i=0; i<g->size();i++) {
                 eq = to_app(g->form(i));
-		
-		if (eq->get_family_id() == m.get_basic_family_id() &&
-		    eq->get_decl_kind() == OP_IMPLIES &&
-		    core_labels.contains(eq->get_arg(0))){
-		  eq = to_app(eq->get_arg(1));
-		}
+        
+        if (eq->get_family_id() == m.get_basic_family_id() &&
+            eq->get_decl_kind() == OP_IMPLIES &&
+            core_labels.contains(eq->get_arg(0))){
+          eq = to_app(eq->get_arg(1));
+        }
 
                 if (eq->get_family_id() == m.get_basic_family_id() &&
                         eq->get_decl_kind() == OP_EQ){
@@ -675,7 +675,7 @@ class fpa2bv_approx_tactic: public tactic {
                            }
 
                            if (!precise_children && !precise_op.contains(lhs)) {
-#ifdef Z3DEBUG                                   
+#ifdef Z3DEBUG
                                std::cout << mk_ismt2_pp(lhs, m) << " is imprecise because some children are imprecise." << std::endl;
 #endif 
                                precise_op.insert(lhs, false);
@@ -927,73 +927,73 @@ class fpa2bv_approx_tactic: public tactic {
             }
         }
 
-		bool increase_term_precision(
-			app * cur,
-			bool isSat,
-			func_decl_ref_vector const & cnsts,
-			obj_map<func_decl, unsigned> & cnst2prec_map,
-			obj_map<func_decl, app*> & cnst2term_map,
-			obj_map<func_decl, unsigned> & new_map){
-			
-			func_decl * f = cur->get_decl();
-			unsigned new_prec = 0, old_prec;
-			bool in_new_map;
-			bool res = false;
-			if (cnst2prec_map.contains(f))
-				new_prec += cnst2prec_map.find(f);
+        bool increase_term_precision(
+            app * cur,
+            bool isSat,
+            func_decl_ref_vector const & cnsts,
+            obj_map<func_decl, unsigned> & cnst2prec_map,
+            obj_map<func_decl, app*> & cnst2term_map,
+            obj_map<func_decl, unsigned> & new_map){
+            
+            func_decl * f = cur->get_decl();
+            unsigned new_prec = 0, old_prec;
+            bool in_new_map;
+            bool res = false;
+            if (cnst2prec_map.contains(f))
+                new_prec += cnst2prec_map.find(f);
 
-			if (new_prec < MAX_PRECISION){
-			  new_prec += PREC_INCREMENT;//(isSat)? PREC_INCREMENT : MAX_PRECISION;
+            if (new_prec < MAX_PRECISION){
+              new_prec += PREC_INCREMENT;//(isSat)? PREC_INCREMENT : MAX_PRECISION;
                 new_prec = (new_prec > MAX_PRECISION) ? MAX_PRECISION : new_prec;
                 new_map.insert(f, new_prec);
                 res = true;
-			}
+            }
 #ifdef Z3DEBUG
-			//std::cout << f->get_name() << ":" << new_prec << std::endl;
-			//std::cout << mk_ismt2_pp(cur, m) << ":" << new_prec << std::endl;
+            //std::cout << f->get_name() << ":" << new_prec << std::endl;
+            //std::cout << mk_ismt2_pp(cur, m) << ":" << new_prec << std::endl;
 #endif
 
-			if (cnst2term_map.contains(f))
-				cur = cnst2term_map.find(f);
-			// Refine constants that are direct arguments of this term
-			for (unsigned i = 0; i < cur->get_num_args(); i++){
-				func_decl * arg_decl = to_app(cur->get_arg(i))->get_decl();
-				if (!cnst2term_map.contains(arg_decl) && //Not a constant introduced by flattening
-					!m_float_util.is_rm(cur->get_arg(i)) && //OLD:is_rm(...,rm)
-					!m_float_util.is_numeral(cur->get_arg(i))) { //OLD:is_value
-					//It is an input 'variable'
-					if ((in_new_map = new_map.contains(arg_decl)))
-						old_prec = new_map.find(arg_decl);
-					else if (cnst2prec_map.contains(arg_decl))
-						old_prec = cnst2prec_map.find(arg_decl);
-					else
-						old_prec = 0;
+            if (cnst2term_map.contains(f))
+                cur = cnst2term_map.find(f);
+            // Refine constants that are direct arguments of this term
+            for (unsigned i = 0; i < cur->get_num_args(); i++){
+                func_decl * arg_decl = to_app(cur->get_arg(i))->get_decl();
+                if (!cnst2term_map.contains(arg_decl) && //Not a constant introduced by flattening
+                    !m_float_util.is_rm(cur->get_arg(i)) && //OLD:is_rm(...,rm)
+                    !m_float_util.is_numeral(cur->get_arg(i))) { //OLD:is_value
+                    //It is an input 'variable'
+                    if ((in_new_map = new_map.contains(arg_decl)))
+                        old_prec = new_map.find(arg_decl);
+                    else if (cnst2prec_map.contains(arg_decl))
+                        old_prec = cnst2prec_map.find(arg_decl);
+                    else
+                        old_prec = 0;
 
-					if (old_prec < new_prec) {
-						if (in_new_map)
-							new_map.remove(arg_decl);
-						SASSERT(new_prec <= MAX_PRECISION);
-						new_map.insert(arg_decl, new_prec);
-						res = true;
+                    if (old_prec < new_prec) {
+                        if (in_new_map)
+                            new_map.remove(arg_decl);
+                        SASSERT(new_prec <= MAX_PRECISION);
+                        new_map.insert(arg_decl, new_prec);
+                        res = true;
 #ifdef Z3DEBUG
-						//std::cout << "    " << arg_decl->get_name() << ":" << new_prec << std::endl;
+                        //std::cout << "    " << arg_decl->get_name() << ":" << new_prec << std::endl;
 
-						//std::cout << "    " << mk_ismt2_pp(cur->get_arg(i), m) << ":" << new_prec << std::endl;
+                        //std::cout << "    " << mk_ismt2_pp(cur->get_arg(i), m) << ":" << new_prec << std::endl;
 #endif
-					}
-				}
-			}			
+                    }
+                }
+            }            
 #ifdef Z3DEBUG
-			std::cout.flush();
+            std::cout.flush();
 #endif
-			return res;
-		}
+            return res;
+        }
 
-		void blindly_refine(
-		    func_decl_ref_vector const & cnsts,
+        void blindly_refine(
+            func_decl_ref_vector const & cnsts,
             obj_map<func_decl, unsigned> & cnst2prec_map,
             obj_map<func_decl, unsigned> & new_map){
-		    func_decl * f;
+            func_decl * f;
             unsigned prec = 0;
             for (unsigned j = 0; j<cnsts.size(); j++){
                 f = cnsts.get(j);
@@ -1002,25 +1002,25 @@ class fpa2bv_approx_tactic: public tactic {
                 prec = (prec > MAX_PRECISION) ? MAX_PRECISION : prec;
                 new_map.insert(f, prec);
             }
-		}
+        }
 
-		// If new_map is empty, increments precision of all constants
-		// otherwise copies the missing precision values
-		void complete_precision_map(
-			func_decl_ref_vector const & cnsts,
-			obj_map<func_decl, unsigned> & cnst2prec_map,			
-			obj_map<func_decl, unsigned> & new_map){
-			
-			if (new_map.size() > 0) {
-				//Complete precision map
-				func_decl * f;
-				for (unsigned j = 0; j<cnsts.size(); j++)
-					if (!new_map.contains((f = cnsts.get(j))))
-						new_map.insert(f, cnst2prec_map.find(f));
-				
-			}
-			else { //No precision was increased then we increase all of them
-				    blindly_refine(cnsts,cnst2prec_map,new_map);
+        // If new_map is empty, increments precision of all constants
+        // otherwise copies the missing precision values
+        void complete_precision_map(
+            func_decl_ref_vector const & cnsts,
+            obj_map<func_decl, unsigned> & cnst2prec_map,            
+            obj_map<func_decl, unsigned> & new_map){
+            
+            if (new_map.size() > 0) {
+                //Complete precision map
+                func_decl * f;
+                for (unsigned j = 0; j<cnsts.size(); j++)
+                    if (!new_map.contains((f = cnsts.get(j))))
+                        new_map.insert(f, cnst2prec_map.find(f));
+                
+            }
+            else { //No precision was increased then we increase all of them
+                    blindly_refine(cnsts,cnst2prec_map,new_map);
             }
         }
 
@@ -1041,50 +1041,50 @@ class fpa2bv_approx_tactic: public tactic {
             for(std::list<struct pair *>::iterator itp = ranked_terms.begin();
                     itp != ranked_terms.end();
                     itp++) {
-	      increase_term_precision(to_app((*itp)->exp), true, cnsts, cnst2prec_map, cnst2term_map, new_map);
+          increase_term_precision(to_app((*itp)->exp), true, cnsts, cnst2prec_map, cnst2term_map, new_map);
                 delete *itp;
             }
 
-			complete_precision_map(cnsts, cnst2prec_map, new_map);
+            complete_precision_map(cnsts, cnst2prec_map, new_map);
 
         }
 
-		bool increase_precision_from_core(
-		    goal_ref & mg,
-			expr_ref_vector & from_core,
-			func_decl_ref_vector const & cnsts,
-			obj_map<func_decl, unsigned> & cnst2prec_map,
-			obj_map<func_decl, app*> & cnst2term_map,
-			obj_map<func_decl, unsigned> & new_map){
+        bool increase_precision_from_core(
+            goal_ref & mg,
+            expr_ref_vector & from_core,
+            func_decl_ref_vector const & cnsts,
+            obj_map<func_decl, unsigned> & cnst2prec_map,
+            obj_map<func_decl, app*> & cnst2term_map,
+            obj_map<func_decl, unsigned> & new_map){
 
-			//Refine chosen terms and find the any input 'variables' which are
-			//its immediate arguments and refine them as well
+            //Refine chosen terms and find the any input 'variables' which are
+            //its immediate arguments and refine them as well
 
             expr_ref_vector queue(mg->m());
-			for (unsigned i = 0; i < from_core.size(); i ++) {
-			    app * to_refine = to_app(from_core.get(i));
-			    queue.push_back(to_refine);
-			    //std::cout << mk_ismt2_pp(to_refine,m) << std::endl;
-			}
-			bool updated = false;
-			for (unsigned i = 0; i < queue.size(); i ++) {
-			    app * to_refine = to_app(queue.get(i));
-			    //std::cout << "Attempting: " << mk_ismt2_pp(to_refine,m) << std::endl;
-			            //<< ":" << cnst2prec_map.find(to_refine->get_decl())
-			    if (cnsts.contains(to_refine->get_decl()))
-			      updated |= increase_term_precision(to_refine, false, cnsts, cnst2prec_map, cnst2term_map, new_map);
-			    else
-			        for (unsigned j=0; j < to_refine->get_num_args(); j++)
-			            queue.push_back(to_refine->get_arg(j));
+            for (unsigned i = 0; i < from_core.size(); i ++) {
+                app * to_refine = to_app(from_core.get(i));
+                queue.push_back(to_refine);
+                //std::cout << mk_ismt2_pp(to_refine,m) << std::endl;
+            }
+            bool updated = false;
+            for (unsigned i = 0; i < queue.size(); i ++) {
+                app * to_refine = to_app(queue.get(i));
+                //std::cout << "Attempting: " << mk_ismt2_pp(to_refine,m) << std::endl;
+                        //<< ":" << cnst2prec_map.find(to_refine->get_decl())
+                if (cnsts.contains(to_refine->get_decl()))
+                  updated |= increase_term_precision(to_refine, false, cnsts, cnst2prec_map, cnst2term_map, new_map);
+                else
+                    for (unsigned j=0; j < to_refine->get_num_args(); j++)
+                        queue.push_back(to_refine->get_arg(j));
 
-			}
-			
-			if (updated)
-				complete_precision_map(cnsts, cnst2prec_map, new_map);
+            }
+            
+            if (updated)
+                complete_precision_map(cnsts, cnst2prec_map, new_map);
 
-			return updated;
-			
-		}
+            return updated;
+            
+        }
 
 
         void model_guided_approximation_refinement(
@@ -1104,9 +1104,9 @@ class fpa2bv_approx_tactic: public tactic {
             boolean_comparison_of_models(g, mdl, full_mdl, cnst2term_map, expr_count);
             calculate_relative_error(err_est, expr_count, err_ratio_map);
             if (err_ratio_map.empty()) {
-				//assert(new_map.isEmpty())
-				complete_precision_map(cnsts, cnst2prec_map, new_map);
-				//proof_guided_refinement(g,cnsts,cnst2prec_map,new_map);
+                //assert(new_map.isEmpty())
+                complete_precision_map(cnsts, cnst2prec_map, new_map);
+                //proof_guided_refinement(g,cnsts,cnst2prec_map,new_map);
             }
             else {
                 rank_terms (err_ratio_map,cnst2prec_map,ranked_terms);
@@ -1259,7 +1259,8 @@ class fpa2bv_approx_tactic: public tactic {
                                 fpa2bv_converter_prec & fpa2bv,
                                 bit_blaster_rewriter & bv2bool,
                                 sat::solver & solver,
-                                atom2bool_var & map) {
+                                atom2bool_var & map,
+                                expr_ref_vector const & core_labels) {
             // CMW: This is all done using the temporary manager, until at the very end we translate the model back to this->m.
             model_ref md = alloc(model, *m_temp_manager);
             sat::model const & ll_m = solver.get_model();
@@ -1309,16 +1310,16 @@ class fpa2bv_approx_tactic: public tactic {
             return md->translate(translator);
         }
 
-		void get_unsat_core(sat::solver & sat_solver,
+        void get_unsat_core(sat::solver & sat_solver,
                             atom2bool_var & atom_map,
-							expr_ref_vector & core_exprs)
+                            expr_ref_vector & core_exprs)
         {
             sat::literal_vector const & core = sat_solver.get_core();
             
             //std::cout << "Unsat core: " << std::endl;
             //std::cout << "Core size: " << std::endl;
-			ast_translation translator(*m_temp_manager, this->m);
-			for (unsigned i = 0; i < core.size(); i++) {
+            ast_translation translator(*m_temp_manager, this->m);
+            for (unsigned i = 0; i < core.size(); i++) {
                 sat::literal l = core[i];
                 unsigned v = l.var();
                 bool found = false;
@@ -1333,9 +1334,9 @@ class fpa2bv_approx_tactic: public tactic {
                 }
                 SASSERT(found);
                 core_exprs.push_back(translator(e_tm));
-			}
+            }
             std::cout << std::endl;
-			return;
+            return;
         }
 
         void encode_fpa_terms(goal_ref const & g, obj_map<func_decl,app*> & const2term_map)
@@ -1355,7 +1356,7 @@ class fpa2bv_approx_tactic: public tactic {
         lbool approximate_model_construction(goal_ref & g,
                                              expr_ref_vector const & core_labels,
                                              obj_map<func_decl, unsigned> & const2prec_map,
-											 expr_ref_vector & out_core) {
+                                             expr_ref_vector & out_core) {
             lbool r = l_undef;
             // CMW: The following will introduce lots of stuff that we don't need (e.g., symbols)
             // To save memory, we use a separate, new manager that we can throw away afterwards.
@@ -1395,8 +1396,8 @@ class fpa2bv_approx_tactic: public tactic {
                 if (r == l_true)
                 {
                     // we need to get the model and translate it back to m.
-                    m_fpa_model = get_fpa_model(ng, fpa2bv, bv2bool, sat_solver, atom_map).get();
-					//ASSERT("Core should be null", out_core == NULL);
+                    m_fpa_model = get_fpa_model(ng, fpa2bv, bv2bool, sat_solver, atom_map, core_labels_t).get();
+                    //ASSERT("Core should be null", out_core == NULL);
                 }
                 else if (r == l_false)
                 {
@@ -1455,6 +1456,7 @@ class fpa2bv_approx_tactic: public tactic {
                 model_ref & full_mdl,
                 func_decl_ref_vector & constants,
                 obj_map<func_decl, app*> & const2term_map,
+                expr_ref_vector const & core_labels,
                 model_converter_ref & mc,
                 goal_ref_buffer & result ){
             expr_ref res(m);
@@ -1487,6 +1489,14 @@ class fpa2bv_approx_tactic: public tactic {
                     it != const2term_map.end();
                     it++)
                 fmc->insert(it->m_key);
+            for (unsigned i = 0; i < core_labels.size(); i++)
+                fmc->insert(to_app(core_labels[i])->get_decl());
+            for (unsigned i = 0; i < full_mdl->get_num_decls(); i++) {
+                func_decl * d = full_mdl->get_decl(i);
+                if (!constants.contains(d))
+                    fmc->insert(d);
+            }
+
             mc = concat(fmc, model2model_converter(m_fpa_model.get()));
         }
 
@@ -1512,37 +1522,37 @@ class fpa2bv_approx_tactic: public tactic {
 #endif
         }
 
-		void get_terms_from_core(goal_ref mg, obj_map<expr,expr*> & core_map, expr_ref_vector & core_lits, expr_ref_vector & out_relevant_constants){
-			for (unsigned i = 0; i < core_lits.size(); i++) {
-				out_relevant_constants.push_back(core_map.find(core_lits.get(i)));
-			}
-		}
+        void get_terms_from_core(goal_ref mg, obj_map<expr,expr*> & core_map, expr_ref_vector & core_lits, expr_ref_vector & out_relevant_constants){
+            for (unsigned i = 0; i < core_lits.size(); i++) {
+                out_relevant_constants.push_back(core_map.find(core_lits.get(i)));
+            }
+        }
 
-		lbool testCore(const goal_ref &mg, expr_ref_vector & core, obj_map<func_decl, unsigned> & const2prec_map ){
-		    goal_ref ng(alloc(goal, mg->m(), mg->proofs_enabled(), true, true));
+        lbool testCore(const goal_ref &mg, expr_ref_vector & core, obj_map<func_decl, unsigned> & const2prec_map ){
+            goal_ref ng(alloc(goal, mg->m(), mg->proofs_enabled(), true, true));
 
-		    ng->reset_all();
+            ng->reset_all();
 
-		    for (unsigned i = 0; i < core.size(); i++){
-		        ng->assert_expr(core.get(i));
-		    }
+            for (unsigned i = 0; i < core.size(); i++){
+                ng->assert_expr(core.get(i));
+            }
 
-		    obj_map<func_decl, unsigned> local_const2prec_map;
+            obj_map<func_decl, unsigned> local_const2prec_map;
 
-		    for (obj_map<func_decl, unsigned>::iterator it = const2prec_map.begin();
-		            it != const2prec_map.end(); it++){
-		        local_const2prec_map.insert(it->m_key, MAX_PRECISION);
-		    }
+            for (obj_map<func_decl, unsigned>::iterator it = const2prec_map.begin();
+                    it != const2prec_map.end(); it++){
+                local_const2prec_map.insert(it->m_key, MAX_PRECISION);
+            }
 
-			expr_ref_vector ecl(ng->m()), out_core(ng->m());
+            expr_ref_vector ecl(ng->m()), out_core(ng->m());
 #ifdef Z3DEBUG
-			std::cout << "Test core:" <<std::endl;
-			std::cout << "Goal size: " << ng->size() << std::endl;
-			ng->display(std::cout);
+            std::cout << "Test core:" <<std::endl;
+            std::cout << "Goal size: " << ng->size() << std::endl;
+            ng->display(std::cout);
 #endif
 
-			lbool r = approximate_model_construction(ng, ecl, local_const2prec_map, out_core);
-		    
+            lbool r = approximate_model_construction(ng, ecl, local_const2prec_map, out_core);
+            
             return r;
 		}
 
@@ -1713,7 +1723,8 @@ class fpa2bv_approx_tactic: public tactic {
 		    build_dependencies(g,dependencies,const2term);
 
 #ifdef Z3DEBUG
-		    std::cout<< "Dependency map" <<std::endl;
+
+		    std::cout << "Dependency map" << std::endl;
 		    for (obj_map<func_decl,func_decl_ref_vector*>::iterator it = dependencies.begin();
                                 it != dependencies.end();
                                 it++){
@@ -1796,7 +1807,7 @@ class fpa2bv_approx_tactic: public tactic {
 
             vector<expr_ref_vector> seen_cores;
 
-	    double time_stamp;
+            double time_stamp;
             while (!solved && !m_cancel)
             {
                 iteration_cnt ++;
@@ -1829,8 +1840,8 @@ class fpa2bv_approx_tactic: public tactic {
                 TRACE("fpa2bv_approx_goal_i", mg->display(tout); );
 
                 //std::cout<< iteration_cnt << ",";
-				r = approximate_model_construction(mg, core_labels, const2prec_map, out_core_labels);
-				//std::cout << (r==l_true?"SAT,":r==l_false?"UNSAT,":"UNKNOWN,");
+                r = approximate_model_construction(mg, core_labels, const2prec_map, out_core_labels);
+                //std::cout << (r==l_true?"SAT,":r==l_false?"UNSAT,":"UNKNOWN,");
 
                 std::cout << "Approximation is " << (r==l_true?"SAT":r==l_false?"UNSAT":"UNKNOWN") << std::endl;
 
@@ -1847,15 +1858,14 @@ class fpa2bv_approx_tactic: public tactic {
 #endif
                     }
                     else {
-
-		        solved = precise_model_reconstruction(m_fpa_model, full_mdl, mg, err_est, constants, const2term_map, top_order, core_labels);
+                        solved = precise_model_reconstruction(m_fpa_model, full_mdl, mg, err_est, constants, const2term_map, top_order, core_labels);
                         std::cout<<"Patching of the model "<<((solved)?"succeeded":"failed")<<std::endl;
                         std::cout.flush();
                     }
                     if (!solved)
                         model_guided_approximation_refinement(m_fpa_model, full_mdl, mg, constants, const2prec_map, const2term_map, err_est, next_const2prec_map);
                     else
-                        verify_precise_model(g,full_mdl,constants,const2term_map,mc,result);
+                        verify_precise_model(g, full_mdl, constants, const2term_map, core_labels, mc, result);
 
                 } else if (r == l_false) {
                     #ifndef UNSAT_REFINEMENT_ENABLED                    
@@ -1865,49 +1875,49 @@ class fpa2bv_approx_tactic: public tactic {
                         result.back()->assert_expr(m.mk_false());
                     }
                     #else
-					expr_ref_vector relevant_terms(m); 
-					get_terms_from_core(mg, core_labels_mapping , out_core_labels, relevant_terms);
+                    expr_ref_vector relevant_terms(m); 
+                    get_terms_from_core(mg, core_labels_mapping , out_core_labels, relevant_terms);
 
-					std::cout << "Core size: " << out_core_labels.size() << "/"<< mg->size() << std::endl;
-
-
-					if (!increase_precision_from_core(mg, relevant_terms, constants, const2prec_map, const2term_map, next_const2prec_map))
-					{// Refinement failed -> This is unsat.
-					  solved = true;
-					  result.back()->reset();
-					  result.back()->assert_expr(m.mk_false());
-					}
-					else if (!seen_core(seen_cores, out_core_labels)){
-
-					  std::cout << "Approximation solving time: " << (time_stamp = sw.get_current_seconds()) << std::endl;
+                    std::cout << "Core size: " << out_core_labels.size() << "/"<< mg->size() << std::endl;
 
 
-					    lbool is_core_sat = testCore(g, relevant_terms, const2prec_map);
+                    if (!increase_precision_from_core(mg, relevant_terms, constants, const2prec_map, const2term_map, next_const2prec_map))
+                    {// Refinement failed -> This is unsat.
+                        solved = true;
+                        result.back()->reset();
+                        result.back()->assert_expr(m.mk_false());
+                    }
+                    else if (!seen_core(seen_cores, out_core_labels)){
 
-						if (is_core_sat == l_false) {
+                      std::cout << "Approximation solving time: " << (time_stamp = sw.get_current_seconds()) << std::endl;
 
-//						    if (is_core_sat == l_false){
-//						        std::cout << "Found an unsat core at full precision" << std::endl;
-//						    }
 
-							solved = true;
-							result.back()->reset();
-							result.back()->assert_expr(m.mk_false());
-						}
-						else{
-						    expr_ref_vector p_core(out_core_labels);
-						    seen_cores.push_back(p_core);
-						    next_const2prec_map.reset();
-						    blindly_refine(constants,const2prec_map,next_const2prec_map);
-						}
-					}
+                        lbool is_core_sat = testCore(g, relevant_terms, const2prec_map);
+
+                        if (is_core_sat == l_false) {
+
+//                            if (is_core_sat == l_false){
+//                                std::cout << "Found an unsat core at full precision" << std::endl;
+//                            }
+
+                            solved = true;
+                            result.back()->reset();
+                            result.back()->assert_expr(m.mk_false());
+                        }
+                        else{
+                            expr_ref_vector p_core(out_core_labels);
+                            seen_cores.push_back(p_core);
+                            next_const2prec_map.reset();
+                            blindly_refine(constants,const2prec_map,next_const2prec_map);
+                        }
+                    }
                     else {
                         next_const2prec_map.reset();
                         blindly_refine(constants,const2prec_map,next_const2prec_map);
                     }
-		    std::cout << "Unsat core check time:" << (sw.get_current_seconds() - time_stamp) << std::endl;
+                    std::cout << "Unsat core check time:" << (sw.get_current_seconds() - time_stamp) << std::endl;
                     #endif
-					
+                    
                 } else {
                     // CMW: When the sat solver comes back with `unknown', what shall we do?
                     // AZ: Blindly refine?
@@ -1916,15 +1926,15 @@ class fpa2bv_approx_tactic: public tactic {
 
                 const2prec_map.swap(next_const2prec_map);
                 next_const2prec_map.reset();
-		
+        
                 std::cout << "Iteration time: " << sw.get_current_seconds() << std::endl;
             }
 
             std::cout << "=============== Terminating " << std::endl;          
             std::cout << "Iteration count: " << iteration_cnt << std::endl;
 
-	    dec_ref_map_key_values(m, const2term_map);
-	    top_order->reset();
+	        dec_ref_map_key_values(m, const2term_map);
+	        top_order->reset();
         }
     };
 
