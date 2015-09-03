@@ -1712,6 +1712,8 @@ class fpa2bv_approx_tactic: public tactic {
 
 		    build_dependencies(g,dependencies,const2term);
 
+#ifdef Z3DEBUG
+		    std::cout<< "Dependency map" <<std:::endl;
 		    for (obj_map<func_decl,func_decl_ref_vector*>::iterator it = dependencies.begin();
                                 it != dependencies.end();
                                 it++){
@@ -1723,11 +1725,14 @@ class fpa2bv_approx_tactic: public tactic {
             }
 
 		    std::cout << "Topological order:" << std::endl;
+#endif
 		    while (dependencies.size() > 0){
 
 		        func_decl * min_el = find_least_dependent(dependencies,const2term);
 		        order->push_back(min_el);
+#ifdef Z3DEBUG
 		        std::cout << mk_ismt2_pp(min_el , g->m()) <<std::endl;
+#endif
 		        shrink_dependencies(dependencies, min_el);
 		    }
 		    return order;
