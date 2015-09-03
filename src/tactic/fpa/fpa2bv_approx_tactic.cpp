@@ -605,10 +605,11 @@ class fpa2bv_approx_tactic: public tactic {
                 model_ref & full_mdl,
                 goal_ref const & g,
                 obj_map<func_decl,app*> & cnst2term_map,
-                obj_map<expr, double> & err_est) {
+                obj_map<expr, double> & err_est,
+                func_decl_ref_vector * top_order) {
 
             mpf_manager & mpf_mngr = m_float_util.fm();
-            app_ref lhs(m), rhs(m);
+            app_ref lhs(m), rhs(m), cnst(m);
             expr_ref lhs_eval(m);            
             mpf arg_val[4]; //First argument can be rounding mode
             mpf est_arg_val[4];
@@ -616,75 +617,81 @@ class fpa2bv_approx_tactic: public tactic {
             mpf lhs_value, rhs_value, est_rhs_value;
             mpf_rounding_mode rm;
             mpf err, rel_err;
-
+            func_decl * f_decl;
             obj_map<expr, bool> precise_op;
             obj_map<expr, mpf*> actual_value;
-            while (precise_op.size() != cnst2term_map.size())
-                for(unsigned i=0; i<cnsts.size(); i++)
-                    if(cnst2term_map.contains(cnsts.get(i)))
-                    {
-                        lhs = m.mk_const(cnsts.get(i));
-                        rhs = cnst2term_map.find(cnsts.get(i));
-                        if (precise_op.contains(lhs))//already visited, skip
-                                return;
+
+            for (unsigned i = 0; i < top_order->size(); i ++) {
+                f_decl = top_order->get(i);
+                if(cnst2term_map.contains(f_decl)){
+                   lhs = m.mk_const(f_decl);
+                   rhs = cnst2term_map.find(f_decl);
 #ifdef Z3DEBUG
-                        std::cout << "Evaluating: " << lhs << " == " << mk_ismt2_pp(rhs, m) << std::endl;
+                   std::cout << "Evaluating: " << lhs << " == " << mk_ismt2_pp(rhs, m) << std::endl;
 #endif
-                        smallfloat_mdl->eval(lhs, lhs_eval, true);
+                   smallfloat_mdl->eval(lhs, lhs_eval, true);
 
-                        if (m_float_util.is_numeral(lhs_eval, lhs_value)) {//OLD:is_value
-                            bool precise_children = true;
-                            bool seen_all_children = true;
-                            bool children_have_finite_err = true;
-
-
-                            obtain_values(lhs, rhs, smallfloat_mdl, full_mdl, cnst2term_map, precise_op, actual_value,
-                                          err_est, rm, precise_children, seen_all_children, children_have_finite_err, 
-                                          arg_val, est_arg_val, bv_arg_val);
+                   if (m_float_util.is_numeral(lhs_eval, lhs_value)) {
+                       bool precise_children = true;
+                       bool seen_all_children = true;
+                       bool children_have_finite_err = true;
 
 
-                            if (seen_all_children) { //If some arguments are not evaluated yet, skip
-                                if (rhs->get_num_args() == 0)
-                                    evaluate_constant(rhs, smallfloat_mdl, actual_value, rhs_value, est_rhs_value);
-                                else
-                                    full_semantics_eval(rhs, rm, arg_val, est_arg_val, bv_arg_val, rhs_value, est_rhs_value);
+                       obtain_values(lhs, rhs, smallfloat_mdl, full_mdl, cnst2term_map, precise_op, actual_value,
+                                     err_est, rm, precise_children, seen_all_children, children_have_finite_err,
+                                     arg_val, est_arg_val, bv_arg_val);
 
-                                if (mpf_mngr.eq(rhs_value, est_rhs_value)) {
-                                    full_mdl->register_decl((to_app(lhs))->get_decl(), m_float_util.mk_value(est_rhs_value));
-                                    precise_op.insert(lhs, true);
-                                }
-                                else {
 
-                                    full_mdl->register_decl((to_app(lhs))->get_decl(), m_float_util.mk_value(est_rhs_value));
+                       if (seen_all_children) { //If some arguments are not evaluated yet, skip
+                           if (rhs->get_num_args() == 0)
+                               evaluate_constant(rhs, smallfloat_mdl, actual_value, rhs_value, est_rhs_value);
+                           else
+                               full_semantics_eval(rhs, rm, arg_val, est_arg_val, bv_arg_val, rhs_value, est_rhs_value);
+
+                           if (mpf_mngr.eq(rhs_value, est_rhs_value)) {
+                               full_mdl->register_decl((to_app(lhs))->get_decl(), m_float_util.mk_value(est_rhs_value));
+                               precise_op.insert(lhs, true);
+                           }
+                           else {
+
+                               full_mdl->register_decl((to_app(lhs))->get_decl(), m_float_util.mk_value(est_rhs_value));
 #ifdef Z3DEBUG
-                                    std::cout << "Assigning " << mk_ismt2_pp(lhs, m) <<
-                                        " value " << mpf_mngr.to_string(est_rhs_value) << std::endl                                       
-                                        << "Precise children: " << ((precise_children) ? "True" : "False") << std::endl
-                                        << "Lhs model value : " << mpf_mngr.to_string(lhs_value) << " [ == " << mk_ismt2_pp(lhs_eval, m) << "]" << std::endl
-                                        << "Rhs model value : " << mpf_mngr.to_string(rhs_value) << std::endl
-                                        << "Rhs estimate    : " << mpf_mngr.to_string(est_rhs_value) << std::endl;
+                               std::cout << "Assigning " << mk_ismt2_pp(lhs, m) <<
+                                   " value " << mpf_mngr.to_string(est_rhs_value) << std::endl
+                                   << "Precise children: " << ((precise_children) ? "True" : "False") << std::endl
+                                   << "Lhs model value : " << mpf_mngr.to_string(lhs_value) << " [ == " << mk_ismt2_pp(lhs_eval, m) << "]" << std::endl
+                                   << "Rhs model value : " << mpf_mngr.to_string(rhs_value) << std::endl
+                                   << "Rhs estimate    : " << mpf_mngr.to_string(est_rhs_value) << std::endl;
 #endif
 
-                                    calculate_error(lhs, precise_op, err_est, lhs_value, est_rhs_value, children_have_finite_err);
+                               calculate_error(lhs, precise_op, err_est, lhs_value, est_rhs_value, children_have_finite_err);
 
-                                }
+                           }
 
-                                if (!actual_value.contains(lhs)) {
-                                    mpf * tmp = alloc(mpf);
-                                    mpf_mngr.set(*tmp, est_rhs_value);
-                                    actual_value.insert(lhs, tmp);
-                                }
+                           if (!actual_value.contains(lhs)) {
+                               mpf * tmp = alloc(mpf);
+                               mpf_mngr.set(*tmp, est_rhs_value);
+                               actual_value.insert(lhs, tmp);
+                           }
 
-                                if (!precise_children && !precise_op.contains(lhs)) {
+                           if (!precise_children && !precise_op.contains(lhs)) {
 #ifdef Z3DEBUG                                   
-				                    std::cout << mk_ismt2_pp(lhs, m) << " is imprecise because some children are imprecise." << std::endl;
+                               std::cout << mk_ismt2_pp(lhs, m) << " is imprecise because some children are imprecise." << std::endl;
 #endif 
-                                    precise_op.insert(lhs, false);
-                                }
+                               precise_op.insert(lhs, false);
+                           }
 
-                            }
-                        }
-                    }
+                       }
+
+                   }
+               }
+               else {
+
+
+               }
+
+
+            }
 
             for (obj_map<expr, mpf *>::iterator it = actual_value.begin();
                     it != actual_value.end();
@@ -703,6 +710,75 @@ class fpa2bv_approx_tactic: public tactic {
             }
         }
 
+//            while (precise_op.size() != cnst2term_map.size())
+//                for(unsigned i=0; i<cnsts.size(); i++)
+//                    if(cnst2term_map.contains(cnsts.get(i)))
+//                    {
+//                        lhs = m.mk_const(cnsts.get(i));
+//                        rhs = cnst2term_map.find(cnsts.get(i));
+//                        if (precise_op.contains(lhs))//already visited, skip
+//                                return;
+//#ifdef Z3DEBUG
+//                        std::cout << "Evaluating: " << lhs << " == " << mk_ismt2_pp(rhs, m) << std::endl;
+//#endif
+//                        smallfloat_mdl->eval(lhs, lhs_eval, true);
+//
+//                        if (m_float_util.is_numeral(lhs_eval, lhs_value)) {//OLD:is_value
+//                            bool precise_children = true;
+//                            bool seen_all_children = true;
+//                            bool children_have_finite_err = true;
+//
+//
+//                            obtain_values(lhs, rhs, smallfloat_mdl, full_mdl, cnst2term_map, precise_op, actual_value,
+//                                          err_est, rm, precise_children, seen_all_children, children_have_finite_err,
+//                                          arg_val, est_arg_val, bv_arg_val);
+//
+//
+//                            if (seen_all_children) { //If some arguments are not evaluated yet, skip
+//                                if (rhs->get_num_args() == 0)
+//                                    evaluate_constant(rhs, smallfloat_mdl, actual_value, rhs_value, est_rhs_value);
+//                                else
+//                                    full_semantics_eval(rhs, rm, arg_val, est_arg_val, bv_arg_val, rhs_value, est_rhs_value);
+//
+//                                if (mpf_mngr.eq(rhs_value, est_rhs_value)) {
+//                                    full_mdl->register_decl((to_app(lhs))->get_decl(), m_float_util.mk_value(est_rhs_value));
+//                                    precise_op.insert(lhs, true);
+//                                }
+//                                else {
+//
+//                                    full_mdl->register_decl((to_app(lhs))->get_decl(), m_float_util.mk_value(est_rhs_value));
+//#ifdef Z3DEBUG
+//                                    std::cout << "Assigning " << mk_ismt2_pp(lhs, m) <<
+//                                        " value " << mpf_mngr.to_string(est_rhs_value) << std::endl
+//                                        << "Precise children: " << ((precise_children) ? "True" : "False") << std::endl
+//                                        << "Lhs model value : " << mpf_mngr.to_string(lhs_value) << " [ == " << mk_ismt2_pp(lhs_eval, m) << "]" << std::endl
+//                                        << "Rhs model value : " << mpf_mngr.to_string(rhs_value) << std::endl
+//                                        << "Rhs estimate    : " << mpf_mngr.to_string(est_rhs_value) << std::endl;
+//#endif
+//
+//                                    calculate_error(lhs, precise_op, err_est, lhs_value, est_rhs_value, children_have_finite_err);
+//
+//                                }
+//
+//                                if (!actual_value.contains(lhs)) {
+//                                    mpf * tmp = alloc(mpf);
+//                                    mpf_mngr.set(*tmp, est_rhs_value);
+//                                    actual_value.insert(lhs, tmp);
+//                                }
+//
+//                                if (!precise_children && !precise_op.contains(lhs)) {
+//#ifdef Z3DEBUG
+//				                    std::cout << mk_ismt2_pp(lhs, m) << " is imprecise because some children are imprecise." << std::endl;
+//#endif
+//                                    precise_op.insert(lhs, false);
+//                                }
+//
+//                            }
+//                        }
+//                    }
+
+
+
         bool precise_model_reconstruction(
                 model_ref const & mdl,
                 model_ref & full_mdl,
@@ -710,7 +786,8 @@ class fpa2bv_approx_tactic: public tactic {
                 obj_map<expr, double> & err_est,//mpf*
                 func_decl_ref_vector const & cnsts,
                 obj_map<func_decl, app*> & cnst2term_map,
-		expr_ref_vector & core_labels) {
+                func_decl_ref_vector * top_order,
+                expr_ref_vector & core_labels) {
 #ifdef Z3DEBUG
             std::cout << "Attempting to patch small-float model" << std::endl;
 #endif
@@ -718,7 +795,7 @@ class fpa2bv_approx_tactic: public tactic {
             bool is_model=true;
 
             //Evaluation of the model using full fpa semantics and construction of the full model
-           evaluate_and_patch(cnsts, mdl, full_mdl, g, cnst2term_map, err_est);
+           evaluate_and_patch(cnsts, mdl, full_mdl, g, cnst2term_map, err_est, top_order );
 
 #ifdef Z3DEBUG
             std::cout << std::endl << "Printing err_est map" << std::endl;
@@ -1503,15 +1580,14 @@ class fpa2bv_approx_tactic: public tactic {
 		    for (obj_map<func_decl,func_decl_ref_vector*>::iterator it = dependencies.begin();
                     it != dependencies.end();
                     it++){
-                if (it->m_value->contains(dependant)){
+                if (it->m_key != depends_on && it->m_value->contains(dependant)){
                     it->m_value->push_back(depends_on);
                 }
             }
 
 		}
-		void build_dependencies(goal_ref const & g, obj_map<func_decl,func_decl_ref_vector*> & dependencies){
+		void build_dependencies(goal_ref const & g, obj_map<func_decl,func_decl_ref_vector*> & dependencies,obj_map<func_decl, app*> & const2term){
 		    expr_ref_vector q(g->m());
-		    func_decl_ref_vector * dep_set;
 
 		    //Queue the goal
             for (unsigned i = 0; i < g->size(); i++){
@@ -1529,11 +1605,17 @@ class fpa2bv_approx_tactic: public tactic {
                         app * lhs = to_app(cur->get_arg(j)); //one side
                         app * rhs = to_app(cur->get_arg(1-j)); // other side
 
+                        if (lhs->get_num_args() == 0 &&
+                            rhs->get_num_args() == 0 &&
+                            const2term.contains(lhs->get_decl())
+                            && !const2term.contains(rhs->get_decl())){
+                            continue;
+                        }
 
                         if (lhs->get_num_args() == 0 && dependencies.contains(lhs->get_decl())) {
-                            dep_set = dependencies.find(lhs->get_decl());
                             if(rhs->get_num_args() == 0 && dependencies.contains(rhs->get_decl()) ){
                                 //lhs = rhs
+                                //std::cout << mk_ismt2_pp(lhs , g->m()) << " depends on " <<  mk_ismt2_pp(rhs , g->m()) << std::endl;
                                 insert_dependency(dependencies, lhs->get_decl(), rhs->get_decl());
                                 //dep_set->push_back(rhs->get_decl());
                             }
@@ -1543,6 +1625,7 @@ class fpa2bv_approx_tactic: public tactic {
                                     app * desc = to_app(rhs->get_arg(k));
                                     if (dependencies.contains(desc->get_decl())){
                                         SASSERT(desc->get_num_args() == 0);
+                                        //std::cout << mk_ismt2_pp(lhs , g->m()) << " depends on " << mk_ismt2_pp(desc , g->m())<< std::endl;
                                         insert_dependency(dependencies, lhs->get_decl(), desc->get_decl());
                                         //dep_set->push_back(desc->get_decl());
                                     }
@@ -1559,20 +1642,45 @@ class fpa2bv_approx_tactic: public tactic {
                     }
                 }
             }
+
+
 		}
 
-		func_decl* find_least_dependent(obj_map<func_decl,func_decl_ref_vector*> & dependencies){
+		unsigned count_unsorted_deps(func_decl * f, obj_map<func_decl,func_decl_ref_vector*> & dependencies){
+		    func_decl_ref_vector * deps = dependencies.find(f);
+		    unsigned cnt = 0;
+
+		    for (unsigned i = 0; i < deps->size(); i++){
+		        if (dependencies.contains(deps->get(i))){
+		            cnt++;
+		        }
+		    }
+		    return cnt;
+		}
+
+		func_decl* find_least_dependent(obj_map<func_decl,func_decl_ref_vector*> & dependencies,obj_map<func_decl, app*> & const2term){
 		    unsigned  min_size = dependencies.begin()->m_value->size();
 		    func_decl * min_el = dependencies.begin()->m_key;
-
+		    unsigned dependants_not_sorted = count_unsorted_deps(min_el,dependencies);
 		    unsigned current_size;
+		    func_decl * current;
 		    for (obj_map<func_decl,func_decl_ref_vector*>::iterator it = dependencies.begin();
 		            it != dependencies.end();
 		            it++){
+		        current = it->m_key;
 		        current_size = it->m_value->size();
 		        if (current_size < min_size){
-		            min_el = it->m_key;
+		            min_el = current;
 		            min_size = current_size;
+		            dependants_not_sorted = count_unsorted_deps(min_el,dependencies);
+		        }
+		        else if (current_size == min_size){
+		            unsigned cur_cnt = count_unsorted_deps(it->m_key,dependencies);
+		            if (cur_cnt < dependants_not_sorted){
+		                min_el = current;
+                        min_size = current_size;
+                        dependants_not_sorted = count_unsorted_deps(min_el,dependencies);
+		            }
 		        }
 		    }
 		    return min_el;
@@ -1589,7 +1697,7 @@ class fpa2bv_approx_tactic: public tactic {
             dependencies.erase(to_remove);
         }
 
-		func_decl_ref_vector * topological_sort(goal_ref const & g, func_decl_ref_vector & constants){
+		func_decl_ref_vector * topological_sort(goal_ref const & g, func_decl_ref_vector & constants,obj_map<func_decl, app*> & const2term){
 		    func_decl_ref_vector * order = alloc(func_decl_ref_vector,g->m());
 		    func_decl_ref_vector * dep_set;
 		    obj_map<func_decl,func_decl_ref_vector*> dependencies;
@@ -1599,13 +1707,27 @@ class fpa2bv_approx_tactic: public tactic {
 		    for (unsigned i = 0; i < constants.size(); i++){
 		        dep_set = alloc(func_decl_ref_vector,g->m());
 		        dependencies.insert(constants.get(i), dep_set);
+		        //std::cout << "Allocating " << mk_ismt2_pp(constants.get(i) , g->m()) <<std::endl;
 		    }
 
-		    build_dependencies(g,dependencies);
+		    build_dependencies(g,dependencies,const2term);
 
+		    for (obj_map<func_decl,func_decl_ref_vector*>::iterator it = dependencies.begin();
+                                it != dependencies.end();
+                                it++){
+                std::cout << mk_ismt2_pp(it->m_key,g->m()) << ":" << std::endl;
+                for (unsigned i = 0; i < it->m_value->size(); i++){
+                    std::cout <<"\t"<< mk_ismt2_pp(it->m_value->get(i),g->m()) << std::endl;
+                }
+
+            }
+
+		    std::cout << "Topological order:" << std::endl;
 		    while (dependencies.size() > 0){
-		        func_decl * min_el = find_least_dependent(dependencies);
+
+		        func_decl * min_el = find_least_dependent(dependencies,const2term);
 		        order->push_back(min_el);
+		        std::cout << mk_ismt2_pp(min_el , g->m()) <<std::endl;
 		        shrink_dependencies(dependencies, min_el);
 		    }
 		    return order;
@@ -1644,19 +1766,7 @@ class fpa2bv_approx_tactic: public tactic {
             g->display(std::cout);
 #endif
 
-            func_decl_ref_vector * top_order = topological_sort(g, constants);
-            std::cout << "Topological order" << std::endl;
-            for (unsigned i = 0; i < top_order->size(); i++){
-                func_decl * cur = top_order->get(i);
-                if (const2term_map.contains(cur)){
-                    std::cout << mk_ismt2_pp(cur,g->m()) << "=" <<
-                            mk_ismt2_pp(const2term_map.find(cur),g->m()) << std::ends;
-                }
-                else{
-                    std::cout << mk_ismt2_pp(cur,g->m()) << std::endl;
-                }
-            }
-
+            func_decl_ref_vector * top_order = topological_sort(g, constants, const2term_map);
 
             // CMW: We need "labels" associated with each constraint. Later, the
             // unsat cores will be presented to us in the form of these labels. Each
@@ -1733,7 +1843,7 @@ class fpa2bv_approx_tactic: public tactic {
                     }
                     else {
 
-		        solved = precise_model_reconstruction(m_fpa_model, full_mdl, mg, err_est, constants, const2term_map, core_labels);
+		        solved = precise_model_reconstruction(m_fpa_model, full_mdl, mg, err_est, constants, const2term_map, top_order, core_labels);
                         std::cout<<"Patching of the model "<<((solved)?"succeeded":"failed")<<std::endl;
                         std::cout.flush();
                     }
@@ -1809,6 +1919,7 @@ class fpa2bv_approx_tactic: public tactic {
             std::cout << "Iteration count: " << iteration_cnt << std::endl;
 
 	    dec_ref_map_key_values(m, const2term_map);
+	    top_order->reset();
         }
     };
 
