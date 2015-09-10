@@ -16,8 +16,8 @@ Author:
 Revision History:
 
 --*/
-#ifndef _SMT_CONTEXT_H_
-#define _SMT_CONTEXT_H_
+#ifndef SMT_CONTEXT_H_
+#define SMT_CONTEXT_H_
 
 #include"smt_clause.h"
 #include"smt_setup.h"
@@ -157,7 +157,7 @@ namespace smt {
         u_map<bool_var>             m_expr2bool_var;
 #endif
         ptr_vector<expr>            m_bool_var2expr;         // bool_var -> expr
-        char_vector                 m_assignment;  //!< mapping literal id -> assignment lbool
+        signed_char_vector          m_assignment;  //!< mapping literal id -> assignment lbool
         vector<watch_list>          m_watches;     //!< per literal
         vector<clause_set>          m_lit_occs;    //!< index for backward subsumption
         svector<bool_var_data>      m_bdata;       //!< mapping bool_var -> data
@@ -1046,6 +1046,8 @@ namespace smt {
 
         void mk_unsat_core();
 
+        void validate_unsat_core();
+
         void init_search();
 
         void end_search();
@@ -1440,5 +1442,5 @@ namespace smt {
 
 };
 
-#endif /* _SMT_CONTEXT_H_ */
+#endif /* SMT_CONTEXT_H_ */
 

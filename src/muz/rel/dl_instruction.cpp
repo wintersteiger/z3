@@ -25,6 +25,7 @@ Revision History:
 #include"rel_context.h"
 #include"debug.h"
 #include"warning.h"
+#include"dl_table_relation.h"
 
 namespace datalog {
 
@@ -384,8 +385,9 @@ namespace datalog {
             if (!find_fn(r1, r2, fn)) {
                 fn = r1.get_manager().mk_join_fn(r1, r2, m_cols1, m_cols2);
                 if (!fn) {
-                    throw default_exception("trying to perform unsupported join operation on relations of kinds %s and %s",
-                        r1.get_plugin().get_name().bare_str(), r2.get_plugin().get_name().bare_str());
+                    throw default_exception(default_exception::fmt(), 
+                                            "trying to perform unsupported join operation on relations of kinds %s and %s",
+                                            r1.get_plugin().get_name().bare_str(), r2.get_plugin().get_name().bare_str());
                 }
                 store_fn(r1, r2, fn);
             }
@@ -446,7 +448,7 @@ namespace datalog {
             if (!find_fn(r, fn)) {
                 fn = r.get_manager().mk_filter_equal_fn(r, m_value, m_col);
                 if (!fn) {
-                    throw default_exception(
+                    throw default_exception(default_exception::fmt(), 
                         "trying to perform unsupported filter_equal operation on a relation of kind %s",
                         r.get_plugin().get_name().bare_str());
                 }
@@ -495,7 +497,7 @@ namespace datalog {
             if (!find_fn(r, fn)) {
                 fn = r.get_manager().mk_filter_identical_fn(r, m_cols.size(), m_cols.c_ptr());
                 if (!fn) {
-                    throw default_exception(
+                    throw default_exception(default_exception::fmt(), 
                         "trying to perform unsupported filter_identical operation on a relation of kind %s",
                         r.get_plugin().get_name().bare_str());
                 }
@@ -541,7 +543,7 @@ namespace datalog {
             if (!find_fn(r, fn)) {
                 fn = r.get_manager().mk_filter_interpreted_fn(r, m_cond);
                 if (!fn) {
-                    throw default_exception(
+                    throw default_exception(default_exception::fmt(), 
                         "trying to perform unsupported filter_interpreted operation on a relation of kind %s",
                         r.get_plugin().get_name().bare_str());
                 }
@@ -552,7 +554,7 @@ namespace datalog {
             if (r.fast_empty()) {
                 ctx.make_empty(m_reg);
             }            
-            TRACE("dl_verbose", r.display(tout <<"post-filter-interpreted:\n"););
+            //TRACE("dl_verbose", r.display(tout <<"post-filter-interpreted:\n"););
 
             return true;
         }
@@ -597,7 +599,7 @@ namespace datalog {
             if (!find_fn(reg, fn)) {
                 fn = reg.get_manager().mk_filter_interpreted_and_project_fn(reg, m_cond, m_cols.size(), m_cols.c_ptr());
                 if (!fn) {
-                    throw default_exception(
+                    throw default_exception(default_exception::fmt(), 
                         "trying to perform unsupported filter_interpreted_and_project operation on a relation of kind %s",
                         reg.get_plugin().get_name().bare_str());
                 }
@@ -609,7 +611,7 @@ namespace datalog {
             if (ctx.reg(m_res)->fast_empty()) {
                 ctx.make_empty(m_res);
             }
-            TRACE("dl_verbose", reg.display(tout << "post-filter-interpreted-and-project:\n"););
+            //TRACE("dl_verbose", reg.display(tout << "post-filter-interpreted-and-project:\n"););
             return true;
         }
 
@@ -837,7 +839,8 @@ namespace datalog {
             if (!find_fn(r1, r2, fn)) {
                 fn = r1.get_manager().mk_join_project_fn(r1, r2, m_cols1, m_cols2, m_removed_cols);
                 if (!fn) {
-                    throw default_exception("trying to perform unsupported join-project operation on relations of kinds %s and %s",
+                    throw default_exception(default_exception::fmt(), 
+                                            "trying to perform unsupported join-project operation on relations of kinds %s and %s",
                         r1.get_plugin().get_name().bare_str(), r2.get_plugin().get_name().bare_str());
                 }
                 store_fn(r1, r2, fn);
@@ -883,6 +886,59 @@ namespace datalog {
                 removed_cols, result);
     }
 
+    class instr_min : public instruction {
+        reg_idx m_source_reg;
+        reg_idx m_target_reg;
+        unsigned_vector m_group_by_cols;
+        unsigned m_min_col;
+    public:
+        instr_min(reg_idx source_reg, reg_idx target_reg, const unsigned_vector & group_by_cols, unsigned min_col)
+            : m_source_reg(source_reg),
+            m_target_reg(target_reg),
+            m_group_by_cols(group_by_cols),
+            m_min_col(min_col) {
+        }
+        virtual bool perform(execution_context & ctx) {
+            log_verbose(ctx);
+            if (!ctx.reg(m_source_reg)) {
+                ctx.make_empty(m_target_reg);
+                return true;
+            }
+
+            const relation_base & s = *ctx.reg(m_source_reg);
+            if (!s.from_table()) {
+                throw default_exception(default_exception::fmt(), "relation is not a table %s",
+                    s.get_plugin().get_name().bare_str());
+            }
+            ++ctx.m_stats.m_min;
+            const table_relation & tr = static_cast<const table_relation &>(s);
+            const table_base & source_t = tr.get_table();
+            relation_manager & r_manager = s.get_manager();
+
+            const relation_signature & r_sig = s.get_signature();
+            scoped_ptr<table_min_fn> fn = r_manager.mk_min_fn(source_t, m_group_by_cols, m_min_col);
+            table_base * target_t = (*fn)(source_t);
+
+            TRACE("dl",
+                tout << "% ";
+                target_t->display(tout);
+                tout << "\n";);
+
+            relation_base * target_r = r_manager.mk_table_relation(r_sig, target_t);
+            ctx.set_reg(m_target_reg, target_r);
+            return true;
+        }
+        virtual void display_head_impl(execution_context const& ctx, std::ostream & out) const {
+            out << " MIN AGGR ";
+        }
+        virtual void make_annotations(execution_context & ctx) {
+        }
+    };
+
+    instruction * instruction::mk_min(reg_idx source, reg_idx target, const unsigned_vector & group_by_cols,
+        const unsigned min_col) {
+        return alloc(instr_min, source, target, group_by_cols, min_col);
+    }
 
     class instr_select_equal_and_project : public instruction {
         reg_idx m_src;
@@ -909,7 +965,7 @@ namespace datalog {
             if (!find_fn(r, fn)) {
                 fn = r.get_manager().mk_select_equal_and_project_fn(r, m_value, m_col);
                 if (!fn) {
-                    throw default_exception(
+                    throw default_exception(default_exception::fmt(), 
                         "trying to perform unsupported select_equal_and_project operation on a relation of kind %s",
                         r.get_plugin().get_name().bare_str());
                 }

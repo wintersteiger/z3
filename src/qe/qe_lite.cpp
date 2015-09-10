@@ -30,6 +30,7 @@ Revision History:
 #include "bool_rewriter.h"
 #include "var_subst.h"
 #include "uint_set.h"
+#include "ast_util.h"
 #include "qe_util.h"
 #include "th_rewriter.h"
 #include "for_each_expr.h"
@@ -723,7 +724,7 @@ namespace eq {
                     m_subst(r, m_subst_map.size(), m_subst_map.c_ptr(), new_r);
                     m_rewriter(new_r);
                     conjs.reset();
-                    qe::flatten_and(new_r, conjs);
+                    flatten_and(new_r, conjs);
                     reduced = true;
                 }
             }
@@ -1054,7 +1055,7 @@ namespace fm {
         arith_util               m_util;
         constraints              m_constraints;
         expr_ref_vector          m_bvar2expr;
-        char_vector              m_bvar2sign;
+        signed_char_vector       m_bvar2sign;
         obj_map<expr, bvar>      m_expr2bvar;
         char_vector              m_is_int;
         char_vector              m_forbidden;
@@ -2063,7 +2064,7 @@ namespace fm {
                 switch (m_bvar2sign[p]) {
                 case 0:
                     new_lits.push_back(lit);
-                break;
+                    break;
                 case -1:
                     if (!sign(lit))
                         tautology = true;
@@ -2414,7 +2415,7 @@ public:
 
     void operator()(uint_set const& index_set, bool index_of_bound, expr_ref& fml) {
         expr_ref_vector disjs(m);
-        qe::flatten_or(fml, disjs);
+        flatten_or(fml, disjs);
         for (unsigned i = 0; i < disjs.size(); ++i) {
             expr_ref_vector conjs(m);
             conjs.push_back(disjs[i].get());
@@ -2427,7 +2428,7 @@ public:
 
 
     void operator()(uint_set const& index_set, bool index_of_bound, expr_ref_vector& fmls) {
-        qe::flatten_and(fmls);
+        flatten_and(fmls);
         unsigned index;
         if (has_unique_non_ground(fmls, index)) {
             expr_ref fml(m);

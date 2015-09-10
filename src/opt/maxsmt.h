@@ -16,8 +16,8 @@ Author:
 Notes:
 
 --*/
-#ifndef _OPT_MAXSMT_H_
-#define _OPT_MAXSMT_H_
+#ifndef OPT_MAXSMT_H_
+#define OPT_MAXSMT_H_
 
 #include"ast.h"
 #include"params.h"
@@ -100,9 +100,7 @@ namespace opt {
         
 
     protected:
-        void enable_sls(expr_ref_vector const& soft, weights_t& ws);
-        void set_enable_sls(bool f);
-        void set_soft_assumptions();
+        void enable_sls(bool force);
         void trace_bounds(char const* solver);
 
     };

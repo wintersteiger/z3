@@ -16,8 +16,8 @@ Author:
 Notes:
 
 --*/
-#ifndef _STATISTICS_H_
-#define _STATISTICS_H_
+#ifndef STATISTICS_H_
+#define STATISTICS_H_
 
 #include<iostream>
 #include"vector.h"
@@ -41,5 +41,7 @@ public:
     unsigned get_uint_value(unsigned idx) const;
     double get_double_value(unsigned idx) const;
 };
+
+void get_memory_statistics(statistics& st);
 
 #endif

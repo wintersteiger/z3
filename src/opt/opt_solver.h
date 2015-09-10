@@ -18,8 +18,8 @@ Notes:
     Based directly on smt_solver.
    
 --*/
-#ifndef _OPT_SOLVER_H_
-#define _OPT_SOLVER_H_
+#ifndef OPT_SOLVER_H_
+#define OPT_SOLVER_H_
 
 #include"inf_rational.h"
 #include"inf_eps_rational.h"
@@ -76,7 +76,7 @@ namespace opt {
         svector<smt::theory_var>  m_objective_vars;
         vector<inf_eps>     m_objective_values;
         sref_vector<model>  m_models;
-        sort_ref_vector     m_objective_sorts;
+        expr_ref_vector     m_objective_terms;
         svector<bool>       m_valid_objectives;
         bool                m_dump_benchmarks;
         static unsigned     m_dump_count;

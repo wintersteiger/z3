@@ -17,8 +17,8 @@ Notes:
 
 --*/
 
-#ifndef _FPA2BV_REWRITER_H_
-#define _FPA2BV_REWRITER_H_
+#ifndef FPA2BV_REWRITER_H_
+#define FPA2BV_REWRITER_H_
 
 #include"cooperate.h"
 #include"rewriter_def.h"
@@ -103,11 +103,18 @@ struct fpa2bv_rewriter_cfg : public default_rewriter_cfg {
             }
             return BR_FAILED;
         }
-
-        if (m().is_ite(f)) {
+        else if (m().is_ite(f)) {
             SASSERT(num == 3);
             if (m_conv.is_float(args[1])) {
                 m_conv.mk_ite(args[0], args[1], args[2], result);
+                return BR_DONE;
+            }
+            return BR_FAILED;
+        }
+        else if (m().is_distinct(f)) {
+            sort * ds = f->get_domain()[0];
+            if (m_conv.is_float(ds) || m_conv.is_rm(ds)) {
+                m_conv.mk_distinct(f, num, args, result);
                 return BR_DONE;
             }
             return BR_FAILED;
@@ -169,7 +176,7 @@ struct fpa2bv_rewriter_cfg : public default_rewriter_cfg {
             }
         }
 
-        if (f->get_family_id() == null_family_id)
+        if (f->get_family_id() != 0 && f->get_family_id() != m_conv.fu().get_family_id())
         {
             bool is_float_uf = m_conv.is_float(f->get_range());
             unsigned i = 0;

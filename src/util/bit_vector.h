@@ -16,8 +16,8 @@ Author:
 Revision History:
 
 --*/
-#ifndef _BIT_VECTOR_H_
-#define _BIT_VECTOR_H_
+#ifndef BIT_VECTOR_H_
+#define BIT_VECTOR_H_
 
 #include<string.h>
 #include"debug.h"
@@ -94,7 +94,8 @@ public:
     }
     
     void reset() {
-        memset(m_data, 0, m_capacity * sizeof(unsigned));
+        if (m_data)
+            memset(m_data, 0, m_capacity * sizeof(unsigned));
         m_num_bits = 0;
     }
 
@@ -250,5 +251,5 @@ public:
     }
 };
 
-#endif /* _BIT_VECTOR_H_ */
+#endif /* BIT_VECTOR_H_ */
 

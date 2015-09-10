@@ -16,8 +16,8 @@ Author:
 Revision History:
 
 --*/
-#ifndef _THEORY_ARITH_AUX_H_
-#define _THEORY_ARITH_AUX_H_
+#ifndef THEORY_ARITH_AUX_H_
+#define THEORY_ARITH_AUX_H_
 
 #include"inf_eps_rational.h"
 #include"theory_arith.h"
@@ -989,83 +989,6 @@ namespace smt {
     }
 
 
-    /**
-       \brief Select tightest variable x_i to pivot with x_j. The goal
-       is to select a x_i such that the value of x_j is increased
-       (decreased) if inc = true (inc = false), and the tableau
-       remains feasible. Store the gain in x_j of the pivoting
-       operation in 'gain'. Note the gain can be too much. That is,
-       it may make x_i infeasible. In this case, instead of pivoting
-       we move x_j to its upper bound (lower bound) when inc = true (inc = false).
-       
-       If no x_i imposes a restriction on x_j, then return null_theory_var.
-       That is, x_j is free to move to its upper bound (lower bound).
-
-       Get the equations for x_j:
-
-       x_i1 = coeff_1 * x_j + rest_1
-       ...
-       x_in = coeff_n * x_j + rest_n
-
-       gain_k := (upper_bound(x_ik) - value(x_ik))/coeff_k
-
-    */
-
-    template<typename Ext>
-    theory_var theory_arith<Ext>::pick_var_to_leave(
-        bool has_int, theory_var x_j, bool inc, 
-        numeral & a_ij, inf_numeral & gain, bool& skipped_row) {
-        TRACE("opt", tout << "selecting variable to replace v" << x_j << ", inc: " << inc << "\n";);
-        theory_var x_i  = null_theory_var;
-        inf_numeral curr_gain; 
-        column & c      = m_columns[x_j];
-        typename svector<col_entry>::iterator it  = c.begin_entries();
-        typename svector<col_entry>::iterator end = c.end_entries();
-        for (; it != end; ++it) {
-            if (!it->is_dead()) {
-                row & r        = m_rows[it->m_row_id];
-                theory_var s = r.get_base_var();
-                if (s != null_theory_var && !is_quasi_base(s)) {
-                    numeral const & coeff = r[it->m_row_idx].m_coeff;
-                    bool inc_s = coeff.is_neg() ? inc : !inc;
-                    bound * b  = get_bound(s, inc_s);
-                    if (b) {
-                        curr_gain  = get_value(s);
-                        curr_gain -= b->get_value();
-                        curr_gain /= coeff;
-                        if (curr_gain.is_neg())
-                            curr_gain.neg();
-                        if (x_i == null_theory_var || (curr_gain < gain) || (gain.is_zero() && curr_gain.is_zero() && s < x_i)) {
-                            if (is_int(s) && !curr_gain.is_int()) {
-                                skipped_row = true;
-                                continue;
-                            }
-                            if (is_int(x_j) && !curr_gain.is_int()) {
-                                skipped_row = true;
-                                continue;
-                            }
-                            if (!curr_gain.is_int() && has_int) {
-                                skipped_row = true;
-                                continue;
-                            }
-                            x_i  = s;
-                            a_ij = coeff;
-                            gain = curr_gain;
-                            TRACE("opt", 
-                                  tout << "x_i: v" << x_i << ", gain: " << gain << "\n";
-                                  tout << "value(s): (" << get_value(s) << " - " << b->get_value() << ")/" << coeff << "\n";
-                                  display_row(tout, r, true);
-                                  );
-                        }
-                    }
-                }
-                TRACE("opt", tout << "x_i: v" << x_i << ", gain: " << gain << "\n";);
-            }
-        }
-        TRACE("opt", tout << "x_i v" << x_i << "\n";);
-        return x_i;
-    }
-
     template<typename Ext>
     bool theory_arith<Ext>::get_theory_vars(expr * n, uint_set & vars) {
         rational r;
@@ -1387,16 +1310,21 @@ namespace smt {
         inf_numeral& max_gain, // maximal possible gain on x_j
         bool& has_shared,      // determine if pivot involves shared variable
         theory_var& x_i) {     // base variable to pivot with x_j
-        
-        x_i = null_theory_var;
+
         context& ctx = get_context();
+        x_i = null_theory_var;
+        init_gains(x_j, inc, min_gain, max_gain);
+        has_shared |= ctx.is_shared(get_enode(x_j));
+        if (is_int(x_j) && !get_value(x_j).is_int()) {
+            return false;
+        }        
         column & c   = m_columns[x_j];
         typename svector<col_entry>::iterator it  = c.begin_entries();
         typename svector<col_entry>::iterator end = c.end_entries();
-        init_gains(x_j, inc, min_gain, max_gain);
-        has_shared |= ctx.is_shared(get_enode(x_j));
+        bool empty_column = true;
         for (; it != end; ++it) {
             if (it->is_dead()) continue;
+            empty_column = false;
             row const & r = m_rows[it->m_row_id];
             theory_var s  = r.get_base_var();
             numeral const & coeff_ij = r[it->m_row_idx].m_coeff;
@@ -1407,7 +1335,6 @@ namespace smt {
             }
             has_shared |= ctx.is_shared(get_enode(s));
         }
-        bool empty_column = (c.begin_entries() == end);
         TRACE("opt", 
               tout << (safe_gain(min_gain, max_gain)?"safe":"unsafe") << "\n";
               tout << "min gain: " << min_gain;
@@ -1447,8 +1374,7 @@ namespace smt {
     template<typename Ext>
     void theory_arith<Ext>::normalize_gain(numeral const& divisor, inf_numeral & max_gain) const {
         SASSERT(divisor.is_int());
-        SASSERT(divisor.is_pos());
-        if (!divisor.is_one() && !max_gain.is_minus_one()) {
+        if (!divisor.is_minus_one() && !max_gain.is_minus_one()) {
             max_gain = floor(max_gain/divisor)*divisor;
         }
     }
@@ -1473,14 +1399,15 @@ namespace smt {
         if (is_int(x)) {
             min_gain = inf_numeral::one();
         }
+        TRACE("opt",
+              tout << "v" << x << " := " << get_value(x) << " "
+              << "min gain: " << min_gain << " " 
+              << "max gain: " << max_gain << "\n";);           
+                
+
         SASSERT(max_gain.is_minus_one() || !max_gain.is_neg());
         SASSERT(min_gain.is_minus_one() || min_gain.is_one());
-        SASSERT(!is_int(x) || max_gain.is_int());
         SASSERT(is_int(x) == min_gain.is_one());
-        TRACE("opt",
-              tout << "v" << x << " "
-              << "min gain: " << min_gain << " " 
-              << "max gain: " << max_gain << "\n";);              
 
     }
 
@@ -1496,6 +1423,8 @@ namespace smt {
         // a_ij > 0, inc -> decrement x_i
         // a_ij < 0, !inc -> decrement x_i
         // a_ij denominator
+
+        SASSERT(!a_ij.is_zero());
 
         if (!safe_gain(min_gain, max_gain)) return false;
 
@@ -1513,13 +1442,22 @@ namespace smt {
         SASSERT(den_aij.is_pos() && den_aij.is_int());
 
         if (is_int(x_i) && !den_aij.is_one()) {
-            SASSERT(min_gain.is_pos());
-            min_gain = inf_numeral(lcm(min_gain.get_rational(), den_aij));
+            if (min_gain.is_neg()) {
+                min_gain = inf_numeral(den_aij);
+            }
+            else {
+                min_gain = inf_numeral(lcm(min_gain.get_rational(), den_aij));
+            }
             normalize_gain(min_gain.get_rational(), max_gain);
         }
 
         if (!max_inc.is_minus_one()) {
             if (is_int(x_i)) {
+                TRACE("opt",
+                      tout << "v" << x_i << " a_ij " << a_ij << " "
+                      << "min gain: " << min_gain << " " 
+                      << "max gain: " << max_gain << "\n";);
+
                 max_inc = floor(max_inc);
                 normalize_gain(min_gain.get_rational(), max_inc);
             }
@@ -1537,13 +1475,33 @@ namespace smt {
               << "min gain: " << min_gain << " " 
               << "max gain: " << max_gain << " tighter: "
               << (is_tighter?"true":"false") << "\n";);
+
         SASSERT(max_gain.is_minus_one() || !max_gain.is_neg());
         SASSERT(min_gain.is_minus_one() || !min_gain.is_neg());
-        SASSERT(!is_int(x_i) || min_gain.is_pos());
-        SASSERT(!is_int(x_i) || min_gain.is_int());
-        SASSERT(!is_int(x_i) || max_gain.is_int());
+        //SASSERT(!is_int(x_i) || min_gain.is_pos());
+        //SASSERT(!is_int(x_i) || min_gain.is_int());
+        //SASSERT(!is_int(x_i) || max_gain.is_int());
         return is_tighter;
     }
+
+    /**
+       \brief Check if bound change affects interface equality.
+    */
+    template<typename Ext>
+    bool theory_arith<Ext>::has_interface_equality(theory_var x) {
+        theory_var num = get_num_vars();
+        context& ctx = get_context();
+        enode* r = get_enode(x)->get_root();
+        for (theory_var v = 0; v < num; v++) {
+            if (v == x) continue;
+            enode* n = get_enode(v);
+            if (ctx.is_shared(n) && n->get_root() == r) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
 
     /**
        \brief Maximize (Minimize) the given temporary row.
@@ -1561,21 +1519,22 @@ namespace smt {
         context& ctx = get_context();
 
         SASSERT(!maintain_integrality || valid_assignment());
+        SASSERT(satisfy_bounds());
 
         numeral a_ij, curr_a_ij, coeff, curr_coeff;
         inf_numeral min_gain, max_gain, curr_min_gain, curr_max_gain;
-#ifdef _TRACE
         unsigned round = 0;
-#endif
         max_min_t result = OPTIMIZED;
         has_shared = false;
         unsigned max_efforts = 10 + (ctx.get_random_value() % 20);
-        while (best_efforts < max_efforts) {
+        while (best_efforts < max_efforts && !ctx.get_cancel_flag()) {
             theory_var x_j = null_theory_var;
             theory_var x_i = null_theory_var;
             max_gain.reset();
             min_gain.reset();
-            TRACE("opt", tout << "round: " << (round++) << ", max: " << max << "\n"; display_row(tout, r, true); tout << "state:\n"; display(tout););
+            ++round;
+
+            TRACE("opt", tout << "round: " << round << ", max: " << max << "\n"; display_row(tout, r, true); tout << "state:\n"; display(tout););
             typename vector<row_entry>::const_iterator it  = r.begin_entries();
             typename vector<row_entry>::const_iterator end = r.end_entries();
             for (; it != end; ++it) {  
@@ -1589,16 +1548,19 @@ namespace smt {
                     // variable cannot be used for max/min.
                     continue; 
                 }
-                if (!pick_var_to_leave(curr_x_j, curr_inc, curr_a_ij, 
-                                       curr_min_gain, curr_max_gain, 
-                                       has_shared, curr_x_i)) {
+                bool picked_var = pick_var_to_leave(curr_x_j, curr_inc, curr_a_ij, 
+                                                    curr_min_gain, curr_max_gain, 
+                                                    has_shared, curr_x_i);
+
+
+                SASSERT(!picked_var || safe_gain(curr_min_gain, curr_max_gain));
+                
+                if (!picked_var) { //  && (r.size() > 1 || !safe_gain(curr_min_gain, curr_max_gain))
+                    TRACE("opt", tout << "no variable picked\n";);
                     best_efforts++;
                 }
-                else {
-                    SASSERT(safe_gain(curr_min_gain, curr_max_gain));
-                }
-                if (curr_x_i == null_theory_var) {
-                    TRACE("opt", tout << "unbounded\n";);
+                else if (curr_x_i == null_theory_var) {
+                    TRACE("opt", tout << "v" << curr_x_j << " is unrestricted by other variables\n";);
                     // we can increase/decrease curr_x_j as much as we want.
                     x_i   = null_theory_var; // unbounded
                     x_j   = curr_x_j;
@@ -1629,12 +1591,13 @@ namespace smt {
             }
 
             TRACE("opt", tout << "after traversing row:\nx_i: v" << x_i << ", x_j: v" << x_j << ", gain: " << max_gain << "\n";
-                  tout << "best efforts: " << best_efforts << "\n";
-                  display(tout););
+                  tout << "best efforts: " << best_efforts << " has shared: " << has_shared << "\n";);
             
             if (x_j == null_theory_var) {
-                TRACE("opt", tout << "row is " << (max ? "maximized" : "minimized") << "\n";);
+                TRACE("opt", tout << "row is " << (max ? "maximized" : "minimized") << "\n";
+                      display_row(tout, r, true););
                 SASSERT(!maintain_integrality || valid_assignment());
+                SASSERT(satisfy_bounds());
                 result = OPTIMIZED;
                 break; 
             }
@@ -1646,27 +1609,42 @@ namespace smt {
                 // can increase/decrease x_j as much as we want.
                 
                 if (inc && upper(x_j)) {
+                    if (max_gain.is_zero()) return BEST_EFFORT;
                     SASSERT(!unbounded_gain(max_gain));
                     update_value(x_j, max_gain);
                     TRACE("opt", tout << "moved v" << x_j << " to upper bound\n";);
                     SASSERT(!maintain_integrality || valid_assignment());
+                    SASSERT(satisfy_bounds());
                     continue;
                 }
                 if (!inc && lower(x_j)) {
+                    if (max_gain.is_zero()) return BEST_EFFORT;
                     SASSERT(!unbounded_gain(max_gain));
+                    SASSERT(max_gain.is_pos());
                     max_gain.neg();
                     update_value(x_j, max_gain);
                     TRACE("opt", tout << "moved v" << x_j << " to lower bound\n";);
                     SASSERT(!maintain_integrality || valid_assignment());
+                    SASSERT(satisfy_bounds());
                     continue;
                 }
-                if (ctx.is_shared(get_enode(x_j))) {
+#if 0
+                if (ctx.is_shared(get_enode(x_j)) && has_interface_equality(x_j)) {
                     ++best_efforts;
                 }
                 else {
                     SASSERT(unbounded_gain(max_gain));
+                    has_shared = false;
                     best_efforts = 0;
                 }
+#endif
+                //
+                // NB. As it stands this is a possibly unsound conclusion for shared theories.
+                // the tradeoff is non-termination for unbounded objectives in the
+                // presence of sharing.
+                // 
+                has_shared = false;
+                best_efforts = 0;
                 result = UNBOUNDED;
                 break;
             }
@@ -1683,6 +1661,7 @@ namespace smt {
                 }
                 update_value(x_j, max_gain);
                 SASSERT(!maintain_integrality || valid_assignment());
+                SASSERT(satisfy_bounds());
                 continue;
             }
             
@@ -1711,9 +1690,10 @@ namespace smt {
             add_tmp_row(r, coeff, r2);
             SASSERT(r.get_idx_of(x_j) == -1);
             SASSERT(!maintain_integrality || valid_assignment());
+            SASSERT(satisfy_bounds());
         }
         TRACE("opt", display(tout););
-        return (best_efforts>0)?BEST_EFFORT:result;
+        return (best_efforts>0 || ctx.get_cancel_flag())?BEST_EFFORT:result;
     }
 
     /**
@@ -1730,6 +1710,10 @@ namespace smt {
         unsigned& best_efforts, // is bound move a best effort?
         bool& has_shared) {     // does move include shared variables?
         inf_numeral min_gain, max_gain;
+        if (is_int(x_i) && !get_value(x_i).is_int()) {
+            ++best_efforts;
+            return false;
+        }
         init_gains(x_i, inc, min_gain, max_gain);        
         column & c   = m_columns[x_i];
         typename svector<col_entry>::iterator it  = c.begin_entries();
@@ -1786,9 +1770,10 @@ namespace smt {
         expr* e = get_enode(v)->get_owner();
 
         SASSERT(!maintain_integrality || valid_assignment());
+        SASSERT(satisfy_bounds());
         SASSERT(!is_quasi_base(v));
         if ((max && at_upper(v)) || (!max && at_lower(v))) {
-            TRACE("opt", tout << "At bound: " << mk_pp(e, get_manager()) << "...\n";);
+            TRACE("opt", display_var(tout << "At " << (max?"max: ":"min: ") << mk_pp(e, get_manager()) << " \n", v););
             return AT_BOUND; // nothing to be done...
         }
         m_tmp_row.reset();
@@ -1812,10 +1797,10 @@ namespace smt {
             mk_bound_from_row(v, get_value(v), max ? B_UPPER : B_LOWER, m_tmp_row);            
         }
         else if (r == UNBOUNDED) {
-            TRACE("opt", tout << "unbounded: " << mk_pp(e, get_manager()) << "...\n";);
+            TRACE("opt", display_var(tout << "unbounded: " << mk_pp(e, get_manager()) << "\n", v););
         }
         else {
-            TRACE("opt", tout << "not optimized: " << mk_pp(e, get_manager()) << "...\n";);
+            TRACE("opt", display_var(tout << "not optimized: " << mk_pp(e, get_manager()) << "\n", v););
         }
         return r;
     }
@@ -2266,5 +2251,5 @@ namespace smt {
 
 };
 
-#endif /* _THEORY_ARITH_AUX_H_ */
+#endif /* THEORY_ARITH_AUX_H_ */
 

@@ -24,6 +24,7 @@ Notes:
 #include"card2bv_tactic.h"
 #include"pb_rewriter.h"
 #include"ast_util.h"
+#include"ast_pp.h"
 
 namespace pb {
     unsigned card2bv_rewriter::get_num_bits(func_decl* f) {
@@ -473,7 +474,6 @@ public:
                             expr_dependency_ref & core) {
         TRACE("card2bv-before", g->display(tout););
         SASSERT(g->is_well_sorted());
-        fail_if_proof_generation("card2bv", g);
         mc = 0; pc = 0; core = 0; result.reset();
         tactic_report report("card2bv", *g);
         m_rw1.reset(); 
@@ -485,10 +485,9 @@ public:
             return;
         }
                 
-        unsigned size = g->size();
         expr_ref new_f1(m), new_f2(m);
         proof_ref new_pr1(m), new_pr2(m);
-        for (unsigned idx = 0; idx < size; idx++) {
+        for (unsigned idx = 0; !g->inconsistent() && idx < g->size(); idx++) {
             m_rw1(g->form(idx), new_f1, new_pr1);
             TRACE("card2bv", tout << "Rewriting " << mk_ismt2_pp(new_f1.get(), m) << std::endl;);
             m_rw2.rewrite(new_f1, new_f2);

@@ -53,6 +53,7 @@ Notes:
 #include"cooperate.h"
 #include"ast_pp.h"
 #include"quant_hoist.h"
+#include"ast_util.h"
 #include"dl_util.h"
 #include"for_each_ast.h"
 #include"for_each_expr.h"
@@ -111,6 +112,12 @@ public:
         expr* n1, *n2;
         while (is_forall(n)) n = to_quantifier(n)->get_expr();
         if (m.is_implies(n, n1, n2) && is_predicate(n2)) {
+            if (is_var(n1)) {
+                return true;
+            }
+            if (is_quantifier(n1)) {
+                return false;
+            }
             app* a1 = to_app(n1);
             if (m.is_and(a1)) {
                 for (unsigned i = 0; i < a1->get_num_args(); ++i) {
@@ -247,7 +254,7 @@ private:
             m_body.push_back(e1);
             head = e2;
         }
-        qe::flatten_and(m_body);
+        flatten_and(m_body);
         if (premise) {
             p = m.mk_rewrite(fml0, mk_implies(m_body, head));
         }

@@ -16,8 +16,8 @@ Author:
 Notes:
 
 --*/
-#ifndef _FPA2BV_CONVERTER_
-#define _FPA2BV_CONVERTER_
+#ifndef FPA2BV_CONVERTER_H_
+#define FPA2BV_CONVERTER_H_
 
 #include"ast.h"
 #include"obj_hashtable.h"
@@ -80,12 +80,13 @@ public:
 
     void mk_eq(expr * a, expr * b, expr_ref & result);
     void mk_ite(expr * c, expr * t, expr * f, expr_ref & result);
+    void mk_distinct(func_decl * f, unsigned num, expr * const * args, expr_ref & result);
 
     void mk_rounding_mode(func_decl * f, expr_ref & result);
     void mk_numeral(func_decl * f, unsigned num, expr * const * args, expr_ref & result);
     virtual void mk_const(func_decl * f, expr_ref & result);
     virtual void mk_rm_const(func_decl * f, expr_ref & result);
-    void mk_uninterpreted_function(func_decl * f, unsigned num, expr * const * args, expr_ref & result);
+    virtual void mk_uninterpreted_function(func_decl * f, unsigned num, expr * const * args, expr_ref & result);
     void mk_var(unsigned base_inx, sort * srt, expr_ref & result);
 
     void mk_pinf(func_decl * f, expr_ref & result);

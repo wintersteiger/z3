@@ -17,8 +17,8 @@ Author:
 Revision History:
 
 --*/
-#ifndef _SAT_CONFIG_H_
-#define _SAT_CONFIG_H_
+#ifndef SAT_CONFIG_H_
+#define SAT_CONFIG_H_
 
 #include"params.h"
 
@@ -72,7 +72,6 @@ namespace sat {
         bool               m_minimize_core;
         bool               m_minimize_core_partial;
         bool               m_optimize_model;
-        bool               m_soft_assumptions;
         bool               m_bcd;
 
 

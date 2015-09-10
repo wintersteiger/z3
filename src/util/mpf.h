@@ -16,8 +16,8 @@ Author:
 Revision History:
 
 --*/
-#ifndef _MPF_H_
-#define _MPF_H_
+#ifndef MPF_H_
+#define MPF_H_
 
 #include<string>
 #include"mpz.h"
@@ -121,7 +121,7 @@ public:
     void mul(mpf_rounding_mode rm, mpf const & x, mpf const & y, mpf & o);
     void div(mpf_rounding_mode rm, mpf const & x, mpf const & y, mpf & o);    
 
-    void fused_mul_add(mpf_rounding_mode rm, mpf const & x, mpf const & y, mpf const &z, mpf & o);
+    void fma(mpf_rounding_mode rm, mpf const & x, mpf const & y, mpf const &z, mpf & o);
 
     void sqrt(mpf_rounding_mode rm, mpf const & x, mpf & o);
 

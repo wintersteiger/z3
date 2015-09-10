@@ -2059,6 +2059,8 @@ struct
 	(Z3native.fpa_get_numeral_sign (context_gno ctx) (Expr.gno t))
   let get_numeral_significand_string ( ctx : context ) ( t : expr ) =
 	(Z3native.fpa_get_numeral_significand_string (context_gno ctx) (Expr.gno t))
+  let get_numeral_significand_uint ( ctx : context ) ( t : expr ) =
+	(Z3native.fpa_get_numeral_significand_uint64 (context_gno ctx) (Expr.gno t))
   let get_numeral_exponent_string ( ctx : context ) ( t : expr ) =
 	(Z3native.fpa_get_numeral_exponent_string (context_gno ctx) (Expr.gno t))
   let get_numeral_exponent_int ( ctx : context ) ( t : expr ) =
@@ -2197,6 +2199,15 @@ struct
     create ctx (Z3native.mk_goal (context_gno ctx) models unsat_cores proofs)
 
   let to_string ( x : goal ) = Z3native.goal_to_string (z3obj_gnc x) (z3obj_gno x)
+
+  let as_expr ( x : goal ) = 
+	let n = get_size x in
+	if n = 0 then 
+	  (Boolean.mk_true (z3obj_gc x)) 
+	else if n = 1 then
+	  (List.hd (get_formulas x))
+	else
+	  (Boolean.mk_and (z3obj_gc x) (get_formulas x))
 end  
 
 
@@ -2755,7 +2766,7 @@ struct
   let get_help ( x : fixedpoint ) =
     Z3native.fixedpoint_get_help (z3obj_gnc x) (z3obj_gno x)
       
-  let set_params ( x : fixedpoint ) ( p : Params.params )=
+  let set_parameters ( x : fixedpoint ) ( p : Params.params )=
     Z3native.fixedpoint_set_params (z3obj_gnc x) (z3obj_gno x) (z3obj_gno p)
       
   let get_param_descrs ( x : fixedpoint ) =
@@ -2854,6 +2865,89 @@ struct
     (AST.ASTVector.to_expr_list av)
 end
 
+
+module Optimize =  
+struct 
+  type optimize = z3_native_object 
+  type opt = optimize
+  type handle = { opt : opt; h : int } 
+ 
+ 
+  let mk_handle (x : opt) h = { opt = x; h = h } 
+
+ 
+  let mk_opt (ctx : context) = 
+      let res : opt = { m_ctx = ctx;  
+                        m_n_obj = null ; 
+                        inc_ref = Z3native.optimize_inc_ref ; 
+                        dec_ref = Z3native.optimize_dec_ref } in 
+      (z3obj_sno res ctx (Z3native.mk_optimize (context_gno ctx))) ; 
+      (z3obj_create res) ; 
+      res 
+      
+  let get_help ( x : opt ) =  
+    Z3native.optimize_get_help (z3obj_gnc x) (z3obj_gno x) 
+ 
+ 
+  let set_parameters ( x : opt ) ( p : Params.params )= 
+    Z3native.optimize_set_params (z3obj_gnc x) (z3obj_gno x) (z3obj_gno p) 
+        
+  let get_param_descrs ( x : opt ) = 
+    Params.ParamDescrs.param_descrs_of_ptr (z3obj_gc x) (Z3native.optimize_get_param_descrs (z3obj_gnc x) (z3obj_gno x)) 
+        
+  let add ( x : opt ) ( constraints : expr list ) = 
+    let f e = (Z3native.optimize_assert (z3obj_gnc x) (z3obj_gno x) (Expr.gno e)) in 
+    List.iter f constraints  
+ 
+ 
+  let add_soft ( x : opt ) ( e : Expr.expr) ( w : string ) ( s : Symbol.symbol ) = 
+    mk_handle x (Z3native.optimize_assert_soft (z3obj_gnc x) (z3obj_gno x) (Expr.gno e) w (Symbol.gno s)) 
+ 
+ 
+  let maximize ( x : opt ) ( e :  Expr.expr ) =  
+    mk_handle x (Z3native.optimize_maximize (z3obj_gnc x) (z3obj_gno x) (Expr.gno e)) 
+ 
+ 
+  let minimize ( x : opt ) ( e :  Expr.expr ) =  
+    mk_handle x (Z3native.optimize_minimize (z3obj_gnc x) (z3obj_gno x) (Expr.gno e)) 
+    
+  let check  ( x : opt ) =  
+     let r = lbool_of_int (Z3native.optimize_check (z3obj_gnc x) (z3obj_gno x)) in  
+     match r with 
+       | L_TRUE -> Solver.SATISFIABLE 
+       | L_FALSE -> Solver.UNSATISFIABLE 
+       | _ -> Solver.UNKNOWN 
+ 
+ 
+  let get_model ( x : opt ) =  
+     let q = Z3native.optimize_get_model (z3obj_gnc x) (z3obj_gno x) in 
+     if (Z3native.is_null q) then 
+       None 
+     else  
+       Some (Model.create (z3obj_gc x) q) 
+ 
+  let get_lower ( x : handle ) ( idx : int )  = 
+      expr_of_ptr (z3obj_gc x.opt) (Z3native.optimize_get_lower (z3obj_gnc x.opt) (z3obj_gno x.opt) idx) 
+ 
+  let get_upper ( x : handle ) ( idx : int ) =  
+      expr_of_ptr (z3obj_gc x.opt) (Z3native.optimize_get_upper (z3obj_gnc x.opt) (z3obj_gno x.opt) idx)  
+  
+  let push ( x : opt ) = Z3native.optimize_push (z3obj_gnc x) (z3obj_gno x)
+ 
+  let pop ( x : opt ) = Z3native.optimize_pop (z3obj_gnc x) (z3obj_gno x) 
+ 
+  let get_reason_unknown ( x : opt ) =
+    Z3native.optimize_get_reason_unknown (z3obj_gnc x) (z3obj_gno x)
+
+  let to_string ( x : opt ) = Z3native.optimize_to_string (z3obj_gnc x) (z3obj_gno x)  
+ 
+ 
+  let get_statistics ( x : opt ) = 
+     let s = Z3native.optimize_get_statistics (z3obj_gnc x) (z3obj_gno x) in 
+     (Statistics.create (z3obj_gc x) s) 
+ 
+ 
+end 
 
 module SMT =
 struct

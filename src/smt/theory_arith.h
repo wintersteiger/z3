@@ -17,8 +17,8 @@ Author:
 Revision History:
 
 --*/
-#ifndef _THEORY_ARITH_H_
-#define _THEORY_ARITH_H_
+#ifndef THEORY_ARITH_H_
+#define THEORY_ARITH_H_
 
 #include"smt_theory.h"
 #include"map.h"
@@ -879,12 +879,12 @@ namespace smt {
         row               m_tmp_row;
 
         void add_tmp_row(row & r1, numeral const & coeff, row const & r2);
-        theory_var pick_var_to_leave(bool has_int, theory_var x_j, bool inc, numeral & a_ij, inf_numeral & gain, bool& skiped_row);
         bool is_safe_to_leave(theory_var x, bool inc, bool& has_int, bool& is_shared);
         template<bool invert>
         void add_tmp_row_entry(row & r, numeral const & coeff, theory_var v);
         enum max_min_t { UNBOUNDED, AT_BOUND, OPTIMIZED, BEST_EFFORT};
         max_min_t max_min(theory_var v, bool max, bool maintain_integrality, bool& has_shared);
+        bool has_interface_equality(theory_var v);
         bool max_min(svector<theory_var> const & vars);
 
         max_min_t max_min(row& r, bool max, bool maintain_integrality, bool& has_shared);
@@ -1215,5 +1215,5 @@ namespace smt {
     
 };
 
-#endif /* _THEORY_ARITH_H_ */
+#endif /* THEORY_ARITH_H_ */
 

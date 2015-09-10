@@ -93,6 +93,20 @@ void fpa2bv_converter::mk_ite(expr * c, expr * t, expr * f, expr_ref & result) {
     mk_fp(sgn, e, s, result);
 }
 
+void fpa2bv_converter::mk_distinct(func_decl * f, unsigned num, expr * const * args, expr_ref & result) {
+    // Note: in SMT there is only one NaN, so multiple of them are considered 
+    // equal, thus (distinct NaN NaN) is false, even if the two NaNs have 
+    // different bitwise representations (see also mk_eq).
+    result = m.mk_true();
+    for (unsigned i = 0; i < num; i++) {
+        for (unsigned j = i+1; j < num; j++) {
+            expr_ref eq(m);
+            mk_eq(args[i], args[j], eq);
+            m_simp.mk_and(result, m.mk_not(eq), result);
+        }
+    }    
+}
+
 void fpa2bv_converter::mk_numeral(func_decl * f, unsigned num, expr * const * args, expr_ref & result) { 
     SASSERT(num == 0);
     SASSERT(f->get_num_parameters() == 1);
@@ -201,16 +215,16 @@ void fpa2bv_converter::mk_uninterpreted_function(func_decl * f, unsigned num, ex
     expr_ref_buffer new_args(m);
 
     for (unsigned i = 0; i < num ; i ++)
-    if (is_float(args[i]))
-    {
-        expr * sgn, * sig, * exp;
-        split_fp(args[i], sgn, exp, sig);
-        new_args.push_back(sgn);
-        new_args.push_back(sig);
-        new_args.push_back(exp);
-    }
-    else
-        new_args.push_back(args[i]);
+        if (is_float(args[i]))
+        {
+            expr * sgn, * sig, * exp;
+            split_fp(args[i], sgn, exp, sig);
+            new_args.push_back(sgn);
+            new_args.push_back(sig);
+            new_args.push_back(exp);
+        }
+        else
+            new_args.push_back(args[i]);
 
     func_decl * fd;    
     func_decl_triple fd3;
@@ -256,6 +270,7 @@ void fpa2bv_converter::mk_uninterpreted_function(func_decl * f, unsigned num, ex
             func_decl * f_sig = m.mk_func_decl(symbol(name_buffer.c_str()), new_domain.size(), new_domain.c_ptr(), m_bv_util.mk_sort(m_util.get_sbits(f->get_range())-1));
             name_buffer.reset(); name_buffer << f->get_name() << ".exp";
             func_decl * f_exp = m.mk_func_decl(symbol(name_buffer.c_str()), new_domain.size(), new_domain.c_ptr(), m_bv_util.mk_sort(m_util.get_ebits(f->get_range())));
+
             expr_ref a_sgn(m), a_sig(m), a_exp(m);
             a_sgn = m.mk_app(f_sgn, new_args.size(), new_args.c_ptr());
             a_sig = m.mk_app(f_sig, new_args.size(), new_args.c_ptr());
@@ -1403,14 +1418,20 @@ void fpa2bv_converter::mk_fma(func_decl * f, unsigned num, expr * const * args, 
     expr * res_sgn_or_args[3] = { res_sgn_c1, res_sgn_c2, res_sgn_c3 };   
     res_sgn = m_bv_util.mk_bv_or(3, res_sgn_or_args);
 
-    sticky_raw = m_bv_util.mk_extract(sbits-5, 0, sig_abs);
-    sticky = m_bv_util.mk_zero_extend(sbits+3, m.mk_app(bvfid, OP_BREDOR, sticky_raw.get()));
+    if (sbits > 5) {
+        sticky_raw = m_bv_util.mk_extract(sbits - 5, 0, sig_abs);
+        sticky = m_bv_util.mk_zero_extend(sbits + 3, m.mk_app(bvfid, OP_BREDOR, sticky_raw.get()));
+        expr * res_or_args[2] = { m_bv_util.mk_extract(2 * sbits - 1, sbits - 4, sig_abs), sticky };
+        res_sig = m_bv_util.mk_bv_or(2, res_or_args);
+    }
+    else {
+        unsigned too_short = 6 - sbits;
+        sig_abs = m_bv_util.mk_concat(sig_abs, m_bv_util.mk_numeral(0, too_short));
+        res_sig = m_bv_util.mk_extract(sbits + 3, 0, sig_abs);
+    }
     dbg_decouple("fpa2bv_fma_add_sum_sticky", sticky);
+    SASSERT(m_bv_util.get_bv_size(res_sig) == sbits + 4);
 
-    expr * res_or_args[2] = {  m_bv_util.mk_extract(2*sbits-1, sbits-4, sig_abs), sticky };
-    res_sig = m_bv_util.mk_bv_or(2, res_or_args);
-    SASSERT(m_bv_util.get_bv_size(res_sig) == sbits+4);
-    
     expr_ref is_zero_sig(m), nil_sbits4(m);
     nil_sbits4 = m_bv_util.mk_numeral(0, sbits+4);
     m_simp.mk_eq(res_sig, nil_sbits4, is_zero_sig);
@@ -1761,11 +1782,19 @@ void fpa2bv_converter::mk_round_to_integral(func_decl * f, unsigned num, expr * 
     m_simp.mk_ite(c52, v52, res_sig, res_sig);
     m_simp.mk_ite(c51, v51, res_sig, res_sig);
     res_sig = m_bv_util.mk_concat(res_sig, m_bv_util.mk_numeral(0, 3)); // rounding bits are all 0.
-    res_exp = m_bv_util.mk_bv_add(m_bv_util.mk_zero_extend(2, res_exp), m_bv_util.mk_extract(ebits+1, 0, shift));
+    
+    SASSERT(m_bv_util.get_bv_size(res_exp) == ebits);
+    SASSERT(m_bv_util.get_bv_size(shift) == sbits + 1);
+
+    expr_ref e_shift(m);
+    e_shift = (ebits + 2 <= sbits + 1) ? m_bv_util.mk_extract(ebits + 1, 0, shift) :
+                                         m_bv_util.mk_sign_extend((ebits + 2) - (sbits + 1), shift);
+    SASSERT(m_bv_util.get_bv_size(e_shift) == ebits + 2);
+    res_exp = m_bv_util.mk_bv_add(m_bv_util.mk_zero_extend(2, res_exp), e_shift);
 
     SASSERT(m_bv_util.get_bv_size(res_sgn) == 1);
-    SASSERT(m_bv_util.get_bv_size(res_sig) == sbits+4);
-    SASSERT(m_bv_util.get_bv_size(res_exp) == ebits+2);
+    SASSERT(m_bv_util.get_bv_size(res_sig) == sbits + 4);
+    SASSERT(m_bv_util.get_bv_size(res_exp) == ebits + 2);
 
     // CMW: We use the rounder for normalization.
     round(f->get_range(), rm, res_sgn, res_sig, res_exp, v6); 
@@ -2947,7 +2976,7 @@ void fpa2bv_converter::mk_to_sbv(func_decl * f, unsigned num, expr * const * arg
     exp_m_lz = m_bv_util.mk_bv_sub(m_bv_util.mk_sign_extend(2, exp),
                                    m_bv_util.mk_zero_extend(2, lz));
     shift = m_bv_util.mk_bv_sub(exp_m_lz,
-                                m_bv_util.mk_numeral(bv_sz - 1, ebits + 2));
+                                m_bv_util.mk_numeral(bv_sz, ebits + 2));
     shift_neg = m_bv_util.mk_bv_neg(shift);
     bv0_e2 = m_bv_util.mk_numeral(0, ebits + 2);
     shift_abs = m.mk_ite(m_bv_util.mk_sle(shift, bv0_e2), shift_neg, shift);
@@ -2959,8 +2988,8 @@ void fpa2bv_converter::mk_to_sbv(func_decl * f, unsigned num, expr * const * arg
     // sig is of the form +- [1].[sig][r][g][s] ... and at least bv_sz + 3 long    
     //           [1][ ... sig ... ][r][g][ ... s ...]
     // [    ... ubv ...    ][r][g][  ... s ...      ]
-    expr_ref max_shift(m);
-    max_shift = m_bv_util.mk_numeral(sig_sz, sig_sz);
+    // expr_ref max_shift(m);
+    // max_shift = m_bv_util.mk_numeral(sig_sz, sig_sz);
     shift_abs = m_bv_util.mk_zero_extend(sig_sz - ebits - 2, shift_abs);
     SASSERT(m_bv_util.get_bv_size(shift_abs) == sig_sz);
     dbg_decouple("fpa2bv_to_sbv_shift_abs", shift_abs);
@@ -3412,7 +3441,7 @@ void fpa2bv_converter::mk_rounding_mode(func_decl * f, expr_ref & result)
 
 void fpa2bv_converter::dbg_decouple(const char * prefix, expr_ref & e) {    
     #ifdef Z3DEBUG
-    return;
+    // return;
     // CMW: This works only for quantifier-free formulas.
     expr_ref new_e(m);
     new_e = m.mk_fresh_const(prefix, m.get_sort(e));

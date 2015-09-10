@@ -18,8 +18,8 @@ Author:
 Revision History:
 
 --*/
-#ifndef _SAT_SIMPLIFIER_H_
-#define _SAT_SIMPLIFIER_H_
+#ifndef SAT_SIMPLIFIER_H_
+#define SAT_SIMPLIFIER_H_
 
 #include"sat_types.h"
 #include"sat_clause.h"
@@ -173,6 +173,7 @@ namespace sat {
         ~simplifier();
 
         void insert_todo(bool_var v) { m_elim_todo.insert(v); }
+        void reset_todo() { m_elim_todo.reset(); }
 
         void operator()(bool learned);
 

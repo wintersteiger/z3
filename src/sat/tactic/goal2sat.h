@@ -26,8 +26,8 @@ Author:
 Notes:
 
 --*/
-#ifndef _GOAL2SAT_H_
-#define _GOAL2SAT_H_
+#ifndef GOAL2SAT_H_
+#define GOAL2SAT_H_
 
 #include"goal.h"
 #include"sat_solver.h"
@@ -60,6 +60,7 @@ public:
     void operator()(goal const & g, params_ref const & p, sat::solver & t, atom2bool_var & m, dep2asm_map& dep2asm, bool default_external = false);
 
     void set_cancel(bool f);
+
 };
 
 
