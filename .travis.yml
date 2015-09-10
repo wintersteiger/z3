@@ -1,4 +1,12 @@
 language: cpp
+
+os:
+  - linux
+  - osx
+
+jdk:
+  - oraclejdk8
+  
 compiler:
   - gcc
   - clang
@@ -6,8 +14,15 @@ compiler:
 before_install: true
 
 install:
-  - sudo apt-get install python
-  - sudo apt-get install ocaml
+  - if [[ $TRAVIS_OS_NAME == "linux"]]; then
+  	   sudo apt-get install python
+	   sudo apt-get install ocaml
+	fi
+  - if [[ $TRAVIS_OS_NAME == "osx"]]; then
+  	   brew update
+	   brew install gcc;
+	   brew install python
+	fi
 
 before_script: 
   - git clone https://github.com/wintersteiger/z3test.git z3test --branch build-ng
@@ -15,7 +30,6 @@ before_script:
 env: MAKEJOBS=4
 
 script:
-  - jdk_switcher use oraclejdk8
   - git rev-parse --abbrev-ref HEAD
   - git show-ref --abbrev=12 refs/heads/build-ng
   - pwd
