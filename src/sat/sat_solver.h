@@ -38,6 +38,7 @@ Revision History:
 #include"statistics.h"
 #include"stopwatch.h"
 #include"trace.h"
+#include"rlimit.h"
 
 namespace sat {
 
@@ -71,6 +72,7 @@ namespace sat {
         struct abort_solver {};
     protected:
         volatile bool           m_cancel;
+        reslimit&               m_rlimit;
         config                  m_config;
         stats                   m_stats;
         extension *             m_ext;
@@ -145,7 +147,7 @@ namespace sat {
         friend class bceq;
         friend struct mk_stat;
     public:
-        solver(params_ref const & p, extension * ext);
+        solver(params_ref const & p, reslimit& l, extension * ext);
         ~solver();
 
         // -----------------------
@@ -183,6 +185,9 @@ namespace sat {
     protected:
         void del_clause(clause & c);
         clause * mk_clause_core(unsigned num_lits, literal * lits, bool learned);
+        void mk_clause_core(literal_vector const& lits) { mk_clause_core(lits.size(), lits.c_ptr()); }
+        void mk_clause_core(unsigned num_lits, literal * lits) { mk_clause_core(num_lits, lits, false); }
+        void mk_clause_core(literal l1, literal l2) { literal lits[2] = { l1, l2 }; mk_clause_core(2, lits); }
         void mk_bin_clause(literal l1, literal l2, bool learned);
         bool propagate_bin_clause(literal l1, literal l2);
         clause * mk_ter_clause(literal * lits, bool learned);
@@ -235,6 +240,7 @@ namespace sat {
         clause_offset get_offset(clause const & c) const { return m_cls_allocator.get_offset(&c); }
         void checkpoint() {
             if (m_cancel) throw solver_exception(Z3_CANCELED_MSG);
+            if (!m_rlimit.inc()) { m_cancel = true; throw solver_exception(Z3_CANCELED_MSG); }
             ++m_num_checkpoints;
             if (m_num_checkpoints < 10) return;
             m_num_checkpoints = 0;
@@ -400,15 +406,19 @@ namespace sat {
         void reinit_clauses(unsigned old_sz);
 
         literal_vector m_user_scope_literals;
-        literal_vector m_user_scope_literal_pool;
         literal_vector m_aux_literals;
         svector<bin_clause> m_user_bin_clauses;
         void gc_lit(clause_vector& clauses, literal lit);
         void gc_bin(bool learned, literal nlit);
+        void gc_var(bool_var v);
+        bool_var max_var(clause_vector& clauses, bool_var v);
+        bool_var max_var(bool learned, bool_var v);
+
     public:
         void user_push();
         void user_pop(unsigned num_scopes);
         void pop_to_base_level();
+        reslimit& rlimit() { return m_rlimit; }
         // -----------------------
         //
         // Simplification
