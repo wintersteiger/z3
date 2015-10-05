@@ -439,8 +439,8 @@ class fpa2bv_approx_tactic: public tactic {
                 mpf_mngr.rem(est_arg_val[0], est_arg_val[1], est_rhs_value);
                 break;
             case OP_FPA_FMA:
-                mpf_mngr.fused_mul_add(rm, arg_val[1], arg_val[2], arg_val[3], rhs_value);
-                mpf_mngr.fused_mul_add(rm, est_arg_val[1], est_arg_val[2], est_arg_val[3], est_rhs_value);
+                mpf_mngr.fma(rm, arg_val[1], arg_val[2], arg_val[3], rhs_value);
+                mpf_mngr.fma(rm, est_arg_val[1], est_arg_val[2], est_arg_val[3], est_rhs_value);
                 break;
             case OP_FPA_SQRT:
                 mpf_mngr.sqrt(rm, arg_val[1], rhs_value);
@@ -1284,7 +1284,7 @@ class fpa2bv_approx_tactic: public tactic {
 
             TRACE("sat_tactic", model_v2_pp(tout, *md););
             model_converter_ref bb_mc = mk_bit_blaster_model_converter(*m_temp_manager, bv2bool.const2bits());
-            model_converter_ref bv_mc = mk_fpa2bv_model_converter_prec(*m_temp_manager, fpa2bv.const2bv(), fpa2bv.rm_const2bv(), fpa2bv.uf2bvuf(), fpa2bv.uf23bvuf());
+            model_converter_ref bv_mc = mk_fpa2bv_model_converter_prec(*m_temp_manager, fpa2bv.const2bv(), fpa2bv.rm_const2bv(), fpa2bv.uf2bvuf());
             bb_mc->operator()(md, 0);
             bv_mc->operator()(md, 0);
 
@@ -1376,7 +1376,8 @@ class fpa2bv_approx_tactic: public tactic {
                 for (unsigned i = 0; i < core_labels.size(); i++)
                     core_labels_t.push_back(translator(core_labels[i]));
 
-                sat::solver sat_solver(m_params, 0);
+                reslimit limit;
+                sat::solver sat_solver(m_params, limit, 0);
                 atom2bool_var atom_map(*m_temp_manager);
                 { tactic_report report_i("fpa2bv_approx_before_bitblaster", *ng); }
                 fpa2bv_converter_prec fpa2bv(*m_temp_manager, m_mode);
@@ -1747,32 +1748,6 @@ class fpa2bv_approx_tactic: public tactic {
 		    }
 		    return order;
 		}
-
-        bool seen_core( vector<expr_ref_vector> & seen, expr_ref_vector & core){
-            bool is_found = false;
-
-            unsigned found_cnt = 0;
-
-            expr * from_core;
-
-            for (unsigned i = 0; i < seen.size() && !is_found; i++){
-                found_cnt = 0;
-                expr_ref_vector & cur = seen.get(i);
-                for (unsigned j = 0; j < core.size(); j++){
-                    from_core = core.get(j);
-                    for (unsigned k =0 ; k < cur.size(); k++){
-                        if ( from_core == cur.get(k)){
-                            found_cnt++;
-                            break;
-                        }
-                    }
-                }
-                if (found_cnt == core.size()){
-                    is_found = true;
-                }
-            }
-            return is_found;
-        }
 
         virtual void operator()(goal_ref const & g, goal_ref_buffer & result,
                                 model_converter_ref & mc, proof_converter_ref & pc,
