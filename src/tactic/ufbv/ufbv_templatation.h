@@ -27,26 +27,33 @@ Notes:
 #include"check_sat_result.h"
 #include"bv_decl_plugin.h"
 #include"goal2sat.h"
+#include"th_rewriter.h"
 
 class ufbv_templatation : public check_sat_result {
 public:
-    typedef obj_map<func_decl, expr*> templates_t;
+    class function_template;
+
+    typedef obj_map<func_decl, function_template*> templates_t;
     typedef obj_map<app, app*> calls_t;
 
 protected:
-    ast_manager      & m;
-    params_ref         m_params;
-    bv_util            m_bv_util;
-    goal               m_goal;
+    ast_manager        & m;
+    params_ref           m_params;
+    bv_util              m_bv_util;
+    goal                 m_goal;
 
-    templates_t        m_templates;
-    calls_t            m_calls;
+    templates_t          m_templates;
+    calls_t              m_calls;
 
+    th_rewriter          m_simplifier;
     bit_blaster_rewriter m_bit_blaster;
-    sat::solver        m_sat_solver;
-    goal2sat           m_goal2sat;
-    atom2bool_var      m_atom2bool;
+    sat::solver          m_sat_solver;
+    goal2sat             m_goal2sat;
+    atom2bool_var        m_atom2bool;
     obj_map<expr, sat::literal> m_dep2asm;
+
+    obj_map<expr, expr*> m_core_labels;
+    sat::literal_vector  m_core_literals;
 
 public:
     ufbv_templatation(ast_manager & m, params_ref const & p);
@@ -67,6 +74,8 @@ protected:
     void blast(expr * e);
     void replace_calls_w_cnsts();
     void instantiate_tmplts();
+    model_ref get_bv_model();
+    expr_ref_vector get_bv_core();
     void display_trace();
 };
 
