@@ -29,30 +29,42 @@ class ufbv_templatation::function_template {
     ast_manager    & m;
     bv_util          m_util;
     func_decl_ref    m_fd;
-    expr_ref_vector  terms;
+    expr_ref_vector  m_terms;
+    unsigned         m_degree;
+    var_ref_vector   m_vars;
 
 public:
-    function_template(ast_manager & m, func_decl * fd) : m(m), m_util(m), terms(m), m_fd(fd, m)  {
+    function_template(ast_manager & m, func_decl * fd) :
+        m(m),
+        m_util(m),
+        m_terms(m),
+        m_fd(fd, m),
+        m_vars(m) {
         // Initial templates are just constants
-        terms.push_back(m.mk_fresh_const(0, fd->get_range()));
+        m_terms.push_back(m.mk_fresh_const(0, fd->get_range()));
+        m_degree = 0;
+        for (unsigned i = 0; i < fd->get_arity(); i++)
+            m_vars.push_back(m.mk_var(i, fd->get_domain()[i]));
     }
 
     ~function_template() {}
 
     expr_ref get_expr() {
         expr_ref res(m);
-        res = terms.get(0);
-        for (unsigned i = 1; i < terms.size(); i++)
-            res = m_util.mk_bv_add(res, terms.get(i));
+        res = m_terms.get(0);
+        for (unsigned i = 1; i < m_terms.size(); i++)
+            res = m_util.mk_bv_add(res, m_terms.get(i));
         return res;
     }
 
     expr_ref instantiate(app * call) {
-        SASSERT(terms.size() > 0);
+        SASSERT(m_terms.size() > 0);
         SASSERT(call->get_decl()->get_family_id() == null_family_id);
+        SASSERT(m_vars.size() == call->get_num_args());
+
         expr_substitution es(m);
-        for (unsigned i = 0; i < call->get_num_args(); i++)
-            es.insert(m.mk_var(i, call->get_decl()->get_domain()[i]), call->get_arg(i));
+        for (unsigned i = 0; i < m_vars.size(); i++)
+            es.insert(m_vars.get(i), call->get_arg(i));
 
         expr_ref res(get_expr(), m);
 
@@ -69,9 +81,9 @@ public:
     }
 
     void display(std::ofstream & out) const {
-        out << mk_ismt2_pp(terms.get(0), m);
-        for (unsigned i = 1; i < terms.size(); i++)
-            out << std::endl << mk_ismt2_pp(terms.get(i), m);
+        out << mk_ismt2_pp(m_terms.get(0), m);
+        for (unsigned i = 1; i < m_terms.size(); i++)
+            out << std::endl << mk_ismt2_pp(m_terms.get(i), m);
     }
 };
 
