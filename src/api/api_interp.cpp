@@ -58,14 +58,12 @@ typedef interpolation_options_struct *Z3_interpolation_options;
 
 extern "C" {
 
-    Z3_context Z3_mk_interpolation_context(Z3_config cfg){
-        if (!cfg) cfg = Z3_mk_config();
-        Z3_set_param_value(cfg, "PROOF", "true");
-        Z3_set_param_value(cfg, "MODEL", "true");
-        // Z3_set_param_value(cfg, "PRE_SIMPLIFIER","false");
-        // Z3_set_param_value(cfg, "SIMPLIFY_CLAUSES","false");
-
-        Z3_context ctx = Z3_mk_context(cfg);
+    Z3_context Z3_mk_interpolation_context(){
+        Z3_context ctx = Z3_mk_context_rc();
+        Z3_update_context_param_value(ctx, "PROOF", "true");
+        Z3_update_context_param_value(ctx, "MODEL", "true");
+        Z3_update_context_param_value(ctx, "PRE_SIMPLIFIER", "false");
+        Z3_update_context_param_value(ctx, "SIMPLIFY_CLAUSES", "false");
         return ctx;
     }
 
@@ -375,7 +373,7 @@ extern "C" {
         for(int i = 0; i < num_theory; i++)
             fmlas[i] = Z3_mk_implies(ctx,Z3_mk_true(ctx),fmlas[i]);
         std::copy(cnsts,cnsts+num,fmlas.begin()+num_theory);
-        Z3_string smt = Z3_benchmark_to_smtlib_string(ctx,"none","AUFLIA","unknown","",num_fmlas-1,&fmlas[0],fmlas[num_fmlas-1]);  
+        Z3_string smt = Z3_benchmark_to_smtlib_string(ctx,"none","AUFLIA","unknown","",num_fmlas-1,&fmlas[0],fmlas[num_fmlas-1]);
         std::ofstream f(filename);
         if(num_theory)
             f << ";! THEORY=" << num_theory << "\n";
@@ -469,7 +467,7 @@ extern "C" {
         }
         f.close();
 
-#if 0    
+#if 0
 
 
         if(!parents){

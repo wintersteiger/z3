@@ -153,10 +153,10 @@ void prove_example2() {
 */
 void nonlinear_example1() {
     std::cout << "nonlinear example 1\n";
-    config cfg;
-    cfg.set("auto_config", true);
-    context c(cfg);
 
+    context c;
+	c.set("auto_config", true);
+	
     expr x = c.real_const("x");
     expr y = c.real_const("y");
     expr z = c.real_const("z");

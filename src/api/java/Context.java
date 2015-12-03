@@ -34,7 +34,7 @@ public class Context extends IDisposable
     {        
         super();
         synchronized (creation_lock) {            
-            m_ctx = Native.mkContextRc(0);
+            m_ctx = Native.mkContextRc();
             initContext();
         }
     }
@@ -59,12 +59,10 @@ public class Context extends IDisposable
     public Context(Map<String, String> settings)
     {
         super();
-        synchronized (creation_lock) {            
-            long cfg = Native.mkConfig();
+        synchronized (creation_lock) {                        
+            m_ctx = Native.mkContextRc();
             for (Map.Entry<String, String> kv : settings.entrySet())
-                Native.setParamValue(cfg, kv.getKey(), kv.getValue());
-            m_ctx = Native.mkContextRc(cfg);
-            Native.delConfig(cfg);
+                Native.updateContextParamValue(m_ctx, kv.getKey(), kv.getValue());
             initContext();
         }
     }

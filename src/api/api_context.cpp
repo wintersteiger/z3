@@ -49,7 +49,7 @@ namespace api {
 
     context::set_interruptable::set_interruptable(context & ctx, event_handler & i):
         m_ctx(ctx) {
-        #pragma omp critical (set_interruptable) 
+        #pragma omp critical (set_interruptable)
         {
             SASSERT(m_ctx.m_interruptable == 0);
             m_ctx.m_interruptable = &i;
@@ -57,7 +57,7 @@ namespace api {
     }
 
     context::set_interruptable::~set_interruptable() {
-        #pragma omp critical (set_interruptable) 
+        #pragma omp critical (set_interruptable)
         {
             m_ctx.m_interruptable = 0;
         }
@@ -80,12 +80,12 @@ namespace api {
         m_error_code = Z3_OK;
         m_print_mode = Z3_PRINT_SMTLIB_FULL;
         m_searching  = false;
-        
+
         m_interruptable = 0;
 
         m_smtlib_parser           = 0;
         m_smtlib_parser_has_decls = false;
-                
+
         m_error_handler = &default_error_handler;
 
         m_basic_fid = m().get_basic_family_id();
@@ -101,7 +101,7 @@ namespace api {
         if (!m_user_ref_count) {
             m_replay_stack.push_back(0);
         }
-    
+
         install_tactics(*this);
     }
 
@@ -127,24 +127,24 @@ namespace api {
                 m_rcf_manager->set_cancel(true);
         }
     }
-    
+
     void context::set_error_code(Z3_error_code err) {
-        m_error_code = err; 
-        if (err != Z3_OK) 
-            invoke_error_handler(err); 
+        m_error_code = err;
+        if (err != Z3_OK)
+            invoke_error_handler(err);
     }
 
     void context::check_searching() {
-        if (m_searching) { 
+        if (m_searching) {
             set_error_code(Z3_INVALID_USAGE); // TBD: error code could be fixed.
-        } 
+        }
     }
 
     char * context::mk_external_string(char const * str) {
         m_string_buffer = str;
         return const_cast<char *>(m_string_buffer.c_str());
     }
-    
+
     char * context::mk_external_string(std::string const & str) {
         m_string_buffer = str;
         return const_cast<char *>(m_string_buffer.c_str());
@@ -161,7 +161,7 @@ namespace api {
         }
         else if (fid == get_datalog_fid() && n.is_uint64()) {
             uint64 sz;
-            if (m_datalog_util.try_get_size(s, sz) && 
+            if (m_datalog_util.try_get_size(s, sz) &&
                 sz <= n.get_uint64()) {
                 invoke_error_handler(Z3_INVALID_ARG);
             }
@@ -171,14 +171,14 @@ namespace api {
             invoke_error_handler(Z3_INVALID_ARG);
         }
         save_ast_trail(e);
-        return e;    
+        return e;
     }
-        
+
     expr * context::mk_and(unsigned num_exprs, expr * const * exprs) {
         switch(num_exprs) {
-        case 0: 
-            return m().mk_true(); 
-        case 1: 
+        case 0:
+            return m().mk_true();
+        case 1:
             save_ast_trail(exprs[0]);
             return exprs[0];
         default: {
@@ -225,13 +225,13 @@ namespace api {
     void context::handle_exception(z3_exception & ex) {
         if (ex.has_error_code()) {
             switch(ex.error_code()) {
-            case ERR_MEMOUT: 
+            case ERR_MEMOUT:
                 set_error_code(Z3_MEMOUT_FAIL);
             break;
-            case ERR_PARSER: 
+            case ERR_PARSER:
                 set_error_code(Z3_PARSER_ERROR);
                 break;
-            case ERR_INI_FILE: 
+            case ERR_INI_FILE:
                 set_error_code(Z3_INVALID_ARG);
                 break;
             case ERR_OPEN_FILE:
@@ -244,10 +244,10 @@ namespace api {
         }
         else {
             m_exception_msg = ex.msg();
-            set_error_code(Z3_EXCEPTION); 
+            set_error_code(Z3_EXCEPTION);
         }
     }
-    
+
     void context::invoke_error_handler(Z3_error_code c) {
         if (m_error_handler) {
             if (g_z3_log) {
@@ -286,10 +286,10 @@ namespace api {
 
     // ------------------------
     //
-    // Parser interface for backward compatibility 
+    // Parser interface for backward compatibility
     //
     // ------------------------
-    
+
     void context::reset_parser() {
         if (m_smtlib_parser) {
             dealloc(m_smtlib_parser);
@@ -300,7 +300,7 @@ namespace api {
         }
         SASSERT(!m_smtlib_parser_has_decls);
     }
-    
+
     void context::extract_smtlib_parser_decls() {
         if (m_smtlib_parser) {
             if (!m_smtlib_parser_has_decls) {
@@ -338,21 +338,12 @@ namespace api {
 // ------------------------
 
 extern "C" {
-    
-    Z3_context Z3_API Z3_mk_context(Z3_config c) {
-        Z3_TRY;
-        LOG_Z3_mk_context(c);
-        memory::initialize(UINT_MAX);
-        Z3_context r = reinterpret_cast<Z3_context>(alloc(api::context, reinterpret_cast<context_params*>(c), false));
-        RETURN_Z3(r);
-        Z3_CATCH_RETURN_NO_HANDLE(0);
-    }
 
-    Z3_context Z3_API Z3_mk_context_rc(Z3_config c) {
+    Z3_context Z3_API Z3_mk_context_rc() {
         Z3_TRY;
-        LOG_Z3_mk_context_rc(c);
+        LOG_Z3_mk_context_rc();
         memory::initialize(UINT_MAX);
-        Z3_context r = reinterpret_cast<Z3_context>(alloc(api::context, reinterpret_cast<context_params*>(c), true));
+        Z3_context r = reinterpret_cast<Z3_context>(alloc(api::context, 0, true));
         RETURN_Z3(r);
         Z3_CATCH_RETURN_NO_HANDLE(0);
     }
@@ -398,9 +389,9 @@ extern "C" {
     }
 
 
-    void Z3_API Z3_get_version(unsigned * major, 
-                               unsigned * minor, 
-                               unsigned * build_number, 
+    void Z3_API Z3_get_version(unsigned * major,
+                               unsigned * minor,
+                               unsigned * build_number,
                                unsigned * revision_number) {
         LOG_Z3_get_version(major, minor, build_number, revision_number);
         *major           = Z3_MAJOR_VERSION;
@@ -439,7 +430,7 @@ extern "C" {
     }
 
     void Z3_API Z3_set_error_handler(Z3_context c, Z3_error_handler h) {
-        RESET_ERROR_CODE();    
+        RESET_ERROR_CODE();
         mk_c(c)->set_error_handler(h);
         // [Leo]: using exception handling, we don't need global error handlers anymore
     }
@@ -481,7 +472,7 @@ extern "C" {
         mk_c(c)->set_print_mode(mode);
         Z3_CATCH;
     }
-    
+
 };
 
 Z3_API ast_manager& Z3_get_manager(Z3_context c) {

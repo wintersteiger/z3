@@ -7,7 +7,6 @@
 
 DEFINE_TYPE(Z3_symbol);
 DEFINE_TYPE(Z3_literals);
-DEFINE_TYPE(Z3_config);
 DEFINE_TYPE(Z3_context);
 DEFINE_TYPE(Z3_sort);
 #define Z3_sort_opt Z3_sort
@@ -51,7 +50,6 @@ DEFINE_TYPE(Z3_rcf_num);
 
    Most of the types in the C API are opaque pointers.
 
-   - \c Z3_config: configuration object used to initialize logical contexts.
    - \c Z3_context: manager of all other Z3 objects, global configuration options, etc.
    - \c Z3_symbol: Lisp-like symbol used to name types, constants, and functions.  A symbol can be created using string or integers.
    - \c Z3_ast: abstract syntax tree node. That is, the data-structure used in Z3 to represent terms, formulas and types.
@@ -1257,7 +1255,6 @@ typedef enum
 /**
   Definitions for update_api.py
 
-  def_Type('CONFIG',           'Z3_config',           'Config')
   def_Type('CONTEXT',          'Z3_context',          'ContextObj')
   def_Type('AST',              'Z3_ast',              'Ast')
   def_Type('APP',              'Z3_app',              'Ast')
@@ -1367,97 +1364,12 @@ extern "C" {
 
     /*@}*/
 
-    /** @name Create configuration */
-    /*@{*/
-
-    /**
-        \deprecated
-        \brief Create a configuration object for the Z3 context object.
-
-        Configurations are created in order to assign parameters prior to creating
-        contexts for Z3 interaction. For example, if the users wishes to use proof
-        generation, then call:
-
-        \ccode{Z3_set_param_value(cfg\, "proof"\, "true")}
-
-        \remark In previous versions of Z3, the \c Z3_config was used to store
-        global and module configurations. Now, we should use \c Z3_global_param_set.
-
-        The following parameters can be set:
-
-            - proof  (Boolean)           Enable proof generation
-            - debug_ref_count (Boolean)  Enable debug support for Z3_ast reference counting
-            - trace  (Boolean)           Tracing support for VCC
-            - trace_file_name (String)   Trace out file for VCC traces
-            - timeout (unsigned)         default timeout (in milliseconds) used for solvers
-            - well_sorted_check          type checker
-            - auto_config                use heuristics to automatically select solver and configure it
-            - model                      model generation for solvers, this parameter can be overwritten when creating a solver
-            - model_validate             validate models produced by solvers
-            - unsat_core                 unsat-core generation for solvers, this parameter can be overwritten when creating a solver
-
-        \sa Z3_set_param_value
-        \sa Z3_del_config
-
-        def_API('Z3_mk_config', CONFIG, ())
-    */
-    Z3_config Z3_API Z3_mk_config(void);
-
-    /**
-        \deprecated
-        \brief Delete the given configuration object.
-
-        \sa Z3_mk_config
-
-        def_API('Z3_del_config', VOID, (_in(CONFIG),))
-    */
-    void Z3_API Z3_del_config(Z3_config c);
-
-    /**
-        \deprecated
-        \brief Set a configuration parameter.
-
-        The following parameters can be set for
-
-        \sa Z3_mk_config
-
-        def_API('Z3_set_param_value', VOID, (_in(CONFIG), _in(STRING), _in(STRING)))
-    */
-    void Z3_API Z3_set_param_value(Z3_config c, Z3_string param_id, Z3_string param_value);
-
-    /*@}*/
-
     /** @name Context and AST Reference Counting */
     /*@{*/
 
     /**
-        \deprecated
        \brief Create a context using the given configuration.
-
-       After a context is created, the configuration cannot be changed,
-       although some parameters can be changed using #Z3_update_param_value.
-       All main interaction with Z3 happens in the context of a \c Z3_context.
-
-       In contrast to #Z3_mk_context_rc, the life time of Z3_ast objects
-       are determined by the scope level of #Z3_push and #Z3_pop.
-       In other words, a Z3_ast object remains valid until there is a
-       call to Z3_pop that takes the current scope below the level where
-       the object was created.
-
-       Note that all other reference counted objects, including Z3_model,
-       Z3_solver, Z3_func_interp have to be managed by the caller.
-       Their reference counts are not handled by the context.
-
-       \sa Z3_del_context
-
-       def_API('Z3_mk_context', CONTEXT, (_in(CONFIG),))
-    */
-    Z3_context Z3_API Z3_mk_context(Z3_config c);
-
-    /**
-       \brief Create a context using the given configuration.
-       This function is similar to #Z3_mk_context. However,
-       in the context returned by this function, the user
+       In the context returned by this function, the user
        is responsible for managing Z3_ast reference counters.
        Managing reference counters is a burden and error-prone,
        but allows the user to use the memory more efficiently.
@@ -1472,9 +1384,9 @@ extern "C" {
        After a context is created, the configuration cannot be changed.
        All main interaction with Z3 happens in the context of a \c Z3_context.
 
-       def_API('Z3_mk_context_rc', CONTEXT, (_in(CONFIG),))
+       def_API('Z3_mk_context_rc', CONTEXT, ())
     */
-    Z3_context Z3_API Z3_mk_context_rc(Z3_config c);
+    Z3_context Z3_API Z3_mk_context_rc(void);
 
     /**
        \brief Delete the given logical context.
@@ -1504,14 +1416,33 @@ extern "C" {
     void Z3_API Z3_dec_ref(Z3_context c, Z3_ast a);
 
     /**
-       \deprecated
-       \brief Set a value of a context parameter.
+        \deprecated
+        \brief Renamed to Z3_update_context_param_value to make it clear that only context-parameters can be changed.
+        def_API('Z3_update_param_value', VOID, (_in(CONTEXT), _in(STRING), _in(STRING)))
+    */
+    void Z3_API Z3_update_param_value(Z3_context c, Z3_string param_id, Z3_string param_value);
+
+    /**
+       \brief Update the value of a context parameter.
+
+       The following parameters can be set:
+
+       - proof  (Boolean)           Enable proof generation
+       - debug_ref_count (Boolean)  Enable debug support for Z3_ast reference counting
+       - trace  (Boolean)           Tracing support for VCC
+       - trace_file_name (String)   Trace out file for VCC traces
+       - timeout (unsigned)         default timeout (in milliseconds) used for solvers
+       - well_sorted_check          type checker
+       - auto_config                use heuristics to automatically select solver and configure it
+       - model                      model generation for solvers, this parameter can be overwritten when creating a solver
+       - model_validate             validate models produced by solvers
+       - unsat_core                 unsat-core generation for solvers, this parameter can be overwritten when creating a solver
 
        \sa Z3_global_param_set
 
-       def_API('Z3_update_param_value', VOID, (_in(CONTEXT), _in(STRING), _in(STRING)))
+       def_API('Z3_update_context_param_value', VOID, (_in(CONTEXT), _in(STRING), _in(STRING)))
     */
-    void Z3_API Z3_update_param_value(Z3_context c, Z3_string param_id, Z3_string param_value);
+    void Z3_API Z3_update_context_param_value(Z3_context c, Z3_string param_id, Z3_string param_value);
 
     /**
        \brief Interrupt the execution of a Z3 procedure.
@@ -1532,8 +1463,7 @@ extern "C" {
        Starting at Z3 4.0, parameter sets are used to configure many components such as:
        simplifiers, tactics, solvers, etc.
 
-       \remark Reference counting must be used to manage parameter sets, even when the Z3_context was
-       created using #Z3_mk_context instead of #Z3_mk_context_rc.
+       \remark Reference counting must be used to manage parameter sets.
 
        def_API('Z3_mk_params', PARAMS, (_in(CONTEXT),))
     */
@@ -1882,7 +1812,7 @@ extern "C" {
        The datatype may be recursive. Return the datatype sort.
 
        \param c logical context.
-	   \param name name of datatype.
+       \param name name of datatype.
        \param num_constructors number of constructors passed in.
        \param constructors array of constructor containers.
 

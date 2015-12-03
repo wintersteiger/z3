@@ -50,11 +50,9 @@ extern "C" {
     with some caution however, as it may be that certain Z3 options
     are incompatible with interpolation.
 
-    def_API('Z3_mk_interpolation_context', CONTEXT, (_in(CONFIG),))
-
+    def_API('Z3_mk_interpolation_context', CONTEXT, ())
     */
-
-    Z3_context Z3_API Z3_mk_interpolation_context(Z3_config cfg);
+    Z3_context Z3_API Z3_mk_interpolation_context(void);
 
     /** Compute an interpolant from a refutation. This takes a proof of
         "false" from a set of formulas C, and an interpolation

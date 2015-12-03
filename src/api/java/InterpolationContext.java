@@ -37,7 +37,7 @@ public class InterpolationContext extends Context
     {
         super();
         synchronized(creation_lock) {
-            m_ctx = Native.mkInterpolationContext(0);
+            m_ctx = Native.mkInterpolationContext();
             initContext(); 
         }
     }
@@ -53,11 +53,9 @@ public class InterpolationContext extends Context
     { 
         super();
         synchronized(creation_lock) {
-            long cfg = Native.mkConfig();
+            m_ctx = Native.mkInterpolationContext();
             for (Map.Entry<String, String> kv : settings.entrySet())
-                Native.setParamValue(cfg, kv.getKey(), kv.getValue());
-            m_ctx = Native.mkInterpolationContext(cfg);
-            Native.delConfig(cfg);
+                Native.updateContextParamValue(m_ctx, kv.getKey(), kv.getValue());
             initContext();
         }
     }

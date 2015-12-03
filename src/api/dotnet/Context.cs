@@ -39,7 +39,7 @@ namespace Microsoft.Z3
         {
             lock (creation_lock)
             {
-                m_ctx = Native.Z3_mk_context_rc(IntPtr.Zero);
+                m_ctx = Native.Z3_mk_context_rc();
                 InitContext();
             }
         }
@@ -69,11 +69,9 @@ namespace Microsoft.Z3
 
             lock (creation_lock)
             {
-                IntPtr cfg = Native.Z3_mk_config();
+                m_ctx = Native.Z3_mk_context_rc();
                 foreach (KeyValuePair<string, string> kv in settings)
-                    Native.Z3_set_param_value(cfg, kv.Key, kv.Value);
-                m_ctx = Native.Z3_mk_context_rc(cfg);
-                Native.Z3_del_config(cfg);
+                    Native.Z3_update_context_param_value(m_ctx, kv.Key, kv.Value);
                 InitContext();
             }
         }
@@ -4413,9 +4411,9 @@ namespace Microsoft.Z3
         /// Only a few configuration parameters are mutable once the context is created.
         /// An exception is thrown when trying to modify an immutable parameter.
         /// </remarks>
-        public void UpdateParamValue(string id, string value)
+        public void UpdateContextParamValue(string id, string value)
         {
-            Native.Z3_update_param_value(nCtx, id, value);
+            Native.Z3_update_context_param_value(nCtx, id, value);
         }
 
         #endregion

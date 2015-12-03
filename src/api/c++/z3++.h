@@ -45,7 +45,6 @@ Notes:
 namespace z3 {
 
     class exception;
-    class config;
     class context;
     class symbol;
     class params;
@@ -87,36 +86,6 @@ namespace z3 {
     inline std::ostream & operator<<(std::ostream & out, exception const & e) { out << e.msg(); return out; }
 
 
-
-    /**
-       \brief Z3 global configuration object.
-    */
-    class config {
-        Z3_config    m_cfg;
-        config(config const & s);
-        config & operator=(config const & s);
-    public:
-        config() { m_cfg = Z3_mk_config(); }
-        ~config() { Z3_del_config(m_cfg); }
-        operator Z3_config() const { return m_cfg; }
-        /**
-           \brief Set global parameter \c param with string \c value.
-        */
-        void set(char const * param, char const * value) { Z3_set_param_value(m_cfg, param, value); }
-        /**
-           \brief Set global parameter \c param with Boolean \c value.
-        */
-        void set(char const * param, bool value) { Z3_set_param_value(m_cfg, param, value ? "true" : "false"); }
-        /**
-           \brief Set global parameter \c param with integer \c value.
-        */
-        void set(char const * param, int value) { 
-            std::ostringstream oss;
-            oss << value;
-            Z3_set_param_value(m_cfg, param, oss.str().c_str());
-        }
-    };
-
     enum check_result {
         unsat, sat, unknown
     };
@@ -127,14 +96,14 @@ namespace z3 {
     class context {
         Z3_context m_ctx;
         static void error_handler(Z3_context c, Z3_error_code e) { /* do nothing */ }
-        void init(config & c) {
-            m_ctx = Z3_mk_context_rc(c);
+        void init() {
+            m_ctx = Z3_mk_context_rc();
             Z3_set_error_handler(m_ctx, error_handler);
             Z3_set_ast_print_mode(m_ctx, Z3_PRINT_SMTLIB2_COMPLIANT);
         }
 
-        void init_interp(config & c) {
-            m_ctx = Z3_mk_interpolation_context(c);
+        void init_interp() {
+            m_ctx = Z3_mk_interpolation_context();
             Z3_set_error_handler(m_ctx, error_handler);
             Z3_set_ast_print_mode(m_ctx, Z3_PRINT_SMTLIB2_COMPLIANT);
         }
@@ -143,9 +112,8 @@ namespace z3 {
         context & operator=(context const & s);
     public:
         struct interpolation {};
-        context() { config c; init(c); }
-        context(config & c) { init(c); }
-	context(config & c, interpolation) { init_interp(c); }
+        context() { init(); }
+		context(interpolation) { init_interp(); }
         ~context() { Z3_del_context(m_ctx); }
         operator Z3_context() const { return m_ctx; }
 

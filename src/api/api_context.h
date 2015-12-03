@@ -44,7 +44,7 @@ namespace realclosure {
 };
 
 namespace api {
-       
+
 
     class context : public tactic_manager {
         struct add_plugins {  add_plugins(ast_manager & m); };
@@ -57,7 +57,7 @@ namespace api {
         bv_util                    m_bv_util;
         datalog::dl_decl_util      m_datalog_util;
         fpa_util                   m_fpa_util;
-	datatype_util              m_dtutil;
+        datatype_util              m_dtutil;
 
         // Support for old solver API
         smt_params                 m_fparams;
@@ -79,7 +79,7 @@ namespace api {
         family_id                  m_pb_fid;
         family_id                  m_fpa_fid;
         datatype_decl_plugin *     m_dt_plugin;
-        
+
         std::string                m_string_buffer; // temporary buffer used to cache strings sent to the "external" world.
 
         Z3_error_code              m_error_code;
@@ -104,7 +104,7 @@ namespace api {
         // Core
         //
         // ------------------------
-        
+
         context(context_params * p, bool user_ref_count = false);
         ~context();
         ast_manager & m() const { return *(m_manager.get()); }
@@ -148,7 +148,7 @@ namespace api {
 
         // Create a numeral of the given sort
         expr * mk_numeral_core(rational const & n, sort * s);
-        
+
         // Return a conjuction that will be exposed to the "external" world.
         expr * mk_and(unsigned num_exprs, expr * const * exprs);
 
@@ -157,14 +157,14 @@ namespace api {
 
         // "Save" an AST that will exposed to the "external" world.
         void save_ast_trail(ast * n);
-        
+
         // Similar to previous method, but it "adds" n to the result.
         void save_multiple_ast_trail(ast * n);
-        
+
         // Reset the cache that stores the ASTs exposed in the previous call.
         // This is a NOOP if ref-count is disabled.
         void reset_last_result();
-        
+
         // "Save" a reference to an object that is exposed by the API
         void save_object(object * r);
 
@@ -176,7 +176,7 @@ namespace api {
         void interrupt();
 
         void invoke_error_handler(Z3_error_code c);
-        
+
         static void out_of_memory_handler(void * _ctx);
 
         void check_sorts(ast * n);
@@ -204,14 +204,14 @@ namespace api {
 
         // ------------------------
         //
-        // Solver interface for backward compatibility 
+        // Solver interface for backward compatibility
         //
         // ------------------------
         smt_params & fparams() { return m_fparams; }
 
         // ------------------------
         //
-        // Parser interface for backward compatibility 
+        // Parser interface for backward compatibility
         //
         // ------------------------
 
@@ -221,12 +221,12 @@ namespace api {
         bool                       m_smtlib_parser_has_decls;
         ptr_vector<func_decl>      m_smtlib_parser_decls;
         ptr_vector<sort>           m_smtlib_parser_sorts;
-        
+
         void reset_parser();
         void extract_smtlib_parser_decls();
-        
+
     };
-    
+
 };
 
 inline api::context * mk_c(Z3_context c) { return reinterpret_cast<api::context*>(c); }
