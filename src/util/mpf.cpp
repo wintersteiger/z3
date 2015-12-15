@@ -961,20 +961,14 @@ void mpf_manager::sqrt(mpf_rounding_mode rm, mpf const & x, mpf & o) {
 
     TRACE("mpf_dbg", tout << "X = " << to_string(x) << std::endl;);
 
-    if (is_nan(x) || is_ninf(x))
+    if (is_nan(x))
         mk_nan(x.ebits, x.sbits, o);
     else if (is_pinf(x))
         set(o, x);
-    else if (x.sign) {
-        if (!m_mpz_manager.is_zero(x.significand))
-            mk_nan(x.ebits, x.sbits, o);
-        else
-            mk_nzero(x.ebits, x.sbits, o);
-    }
-    else if (is_pzero(x))
-        mk_pzero(x.ebits, x.sbits, o);
-    else if (is_nzero(x))
-        mk_nzero(x.ebits, x.sbits, o);
+    else if (is_zero(x))
+        set(o, x);
+    else if (x.sign)
+        mk_nan(x.ebits, x.sbits, o);
     else {
         o.ebits = x.ebits;
         o.sbits = x.sbits;
@@ -986,8 +980,7 @@ void mpf_manager::sqrt(mpf_rounding_mode rm, mpf const & x, mpf & o) {
 
         TRACE("mpf_dbg", tout << "A = " << to_string(a) << std::endl;);
 
-        m_mpz_manager.mul2k(a.significand(), x.sbits + ((a.exponent() % 2)?6:5));        
-        // my_mpz_sqrt(m_mpz_manager, x.sbits, a.exponent % 2 ? true : false, a.significand, o.significand);
+        m_mpz_manager.mul2k(a.significand(), x.sbits + ((a.exponent() % 2)?6:7)); 
         if (!m_mpz_manager.root(a.significand(), 2, o.significand))
         {
             // If the result is inexact, it is 1 too large.
@@ -997,8 +990,9 @@ void mpf_manager::sqrt(mpf_rounding_mode rm, mpf const & x, mpf & o) {
             TRACE("mpf_dbg", tout << "dec'ed " << m_mpz_manager.to_string(o.significand) << std::endl;);
         }
         o.exponent = a.exponent() >> 1;
+        if (a.exponent() % 2 == 0) o.exponent--;
 
-        round_sqrt(rm, o);        
+        round(rm, o);
     }
 
     TRACE("mpf_dbg", tout << "SQRT = " << to_string(o) << std::endl;);
@@ -1179,6 +1173,21 @@ void mpf_manager::to_sbv_mpq(mpf_rounding_mode rm, const mpf & x, scoped_mpq & o
     if (x.sign) m_mpq_manager.neg(o);
 }
 
+void mpf_manager::to_ieee_bv_mpz(const mpf & x, scoped_mpz & o) {
+    SASSERT(!is_nan(x) && !is_inf(x));
+    SASSERT(exp(x) < INT_MAX);
+       
+    unsigned sbits = x.get_sbits();
+    unsigned ebits = x.get_ebits();
+    scoped_mpz biased_exp(m_mpz_manager);
+    m_mpz_manager.set(biased_exp, bias_exp(ebits, exp(x)));
+    m_mpz_manager.set(o, sgn(x));
+    m_mpz_manager.mul2k(o, ebits);
+    m_mpz_manager.add(o, biased_exp, o);
+    m_mpz_manager.mul2k(o, sbits - 1);
+    m_mpz_manager.add(o, sig(x), o);
+}
+
 void mpf_manager::rem(mpf const & x, mpf const & y, mpf & o) {
     SASSERT(x.sbits == y.sbits && x.ebits == y.ebits);
 
@@ -1241,12 +1250,13 @@ void mpf_manager::rem(mpf const & x, mpf const & y, mpf & o) {
 void mpf_manager::maximum(mpf const & x, mpf const & y, mpf & o) {
     if (is_nan(x))
         set(o, y);
-    else if (is_zero(x) && is_zero(y) && sgn(x) != sgn(y))
-        mk_pzero(x.ebits, x.sbits, o);
-    else if (is_zero(x) && is_zero(y))
-        set(o, y);
     else if (is_nan(y))
         set(o, x);
+    else if (is_zero(x) && is_zero(y) && sgn(x) != sgn(y)) {                
+        UNREACHABLE(); // max(+0, -0) and max(-0, +0) are unspecified. 
+    }
+    else if (is_zero(x) && is_zero(y))
+        set(o, y);    
     else if (gt(x, y))
         set(o, x);
     else
@@ -1256,12 +1266,13 @@ void mpf_manager::maximum(mpf const & x, mpf const & y, mpf & o) {
 void mpf_manager::minimum(mpf const & x, mpf const & y, mpf & o) {
     if (is_nan(x))
         set(o, y);
-    else if (is_zero(x) && is_zero(y) && sgn(x) != sgn(y))
-        mk_pzero(x.ebits, x.sbits, o);
-    else if (is_zero(x) && is_zero(y))
-        set(o, y);
     else if (is_nan(y))
         set(o, x);
+    else if (is_zero(x) && is_zero(y) && sgn(x) != sgn(y)) {
+        UNREACHABLE(); // min(+0, -0) and min(-0, +0) are unspecified. 
+    } 
+    else if (is_zero(x) && is_zero(y))
+        set(o, y);    
     else if (lt(x, y))
         set(o, x);
     else
@@ -1512,6 +1523,9 @@ mpf_exp_t mpf_manager::mk_max_exp(unsigned ebits) {
     return m_mpz_manager.get_int64(m_powers2.m1(ebits-1, false));
 }
 
+mpf_exp_t mpf_manager::bias_exp(unsigned ebits, mpf_exp_t unbiased_exponent) {
+    return unbiased_exponent + m_mpz_manager.get_int64(m_powers2.m1(ebits - 1, false));
+}
 mpf_exp_t mpf_manager::unbias_exp(unsigned ebits, mpf_exp_t biased_exponent) {
     return biased_exponent - m_mpz_manager.get_int64(m_powers2.m1(ebits - 1, false));
 }
@@ -1582,6 +1596,13 @@ void mpf_manager::mk_ninf(unsigned ebits, unsigned sbits, mpf & o) {
 }
 
 void mpf_manager::unpack(mpf & o, bool normalize) {
+    TRACE("mpf_dbg", tout << "unpack " << to_string(o) << ": ebits=" << 
+                             o.ebits << " sbits=" << o.sbits << 
+                             " normalize=" << normalize << 
+                             " has_top_exp=" << has_top_exp(o) << " (" << mk_top_exp(o.ebits) << ")" << 
+                             " has_bot_exp=" << has_bot_exp(o) << " (" << mk_bot_exp(o.ebits) << ")" <<
+                             " is_zero=" << is_zero(o) << std::endl;);
+
     // Insert the hidden bit or adjust the exponent of denormal numbers.    
     if (is_zero(o))
         return;

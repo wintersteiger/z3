@@ -40,7 +40,6 @@ namespace smt {
         m_max_cexs(1),
         m_iteration_idx(0),
         m_curr_model(0),
-        m_cancel(false),
         m_new_instances_bindings(m) {
     }
 
@@ -176,10 +175,11 @@ namespace smt {
             bindings.set(num_decls - i - 1, sk_value);
         }
         
-        TRACE("model_checker", tout << q->get_qid() << " found (use_inv: " << use_inv << ") new instance:\n";
+        TRACE("model_checker", tout << q->get_qid() << " found (use_inv: " << use_inv << ") new instance: ";
               for (unsigned i = 0; i < num_decls; i++) {
-                  tout << mk_ismt2_pp(bindings[i], m_manager) << "\n";
-              });
+                  tout << mk_ismt2_pp(bindings[i], m_manager) << " ";
+              }
+              tout << "\n";);
         
         for (unsigned i = 0; i < num_decls; i++) 
             m_new_instances_bindings.push_back(bindings[i]);

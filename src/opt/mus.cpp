@@ -33,25 +33,20 @@ struct mus::imp {
     ast_manager&             m;
     expr_ref_vector          m_cls2expr;
     obj_map<expr, unsigned>  m_expr2cls;
-    volatile bool            m_cancel;
     model_ref                m_model;
     expr_ref_vector          m_soft;
     vector<rational>         m_weights;
     rational                 m_weight;
 
     imp(solver& s, ast_manager& m): 
-        m_s(s), m(m), m_cls2expr(m),  m_cancel(false), m_soft(m)
+        m_s(s), m(m), m_cls2expr(m),  m_soft(m)
     {}
 
     void reset() {
         m_cls2expr.reset();
         m_expr2cls.reset();
     }
-        
-    void set_cancel(bool f) {
-        m_cancel = f;
-    }
-    
+            
     
     unsigned add_soft(expr* cls) {
         SASSERT(is_uninterp_const(cls) || 
@@ -60,7 +55,7 @@ struct mus::imp {
         m_expr2cls.insert(cls, idx);
         m_cls2expr.push_back(cls);
         TRACE("opt", tout << idx << ": " << mk_pp(cls, m) << "\n";
-	      display_vec(tout, m_cls2expr););
+        display_vec(tout, m_cls2expr););
         return idx;
     }
     
@@ -115,10 +110,10 @@ struct mus::imp {
                             core.push_back(cls_id);
                         }
                     }
-		    TRACE("opt", display_vec(tout << "core exprs:", core_exprs);
-			  display_vec(tout << "core:", core);
-			  display_vec(tout << "mus:", mus);
-			  );
+                    TRACE("opt", display_vec(tout << "core exprs:", core_exprs);
+                        display_vec(tout << "core:", core);
+                        display_vec(tout << "mus:", mus);
+                    );
 
                 }
                 break;
@@ -152,17 +147,15 @@ struct mus::imp {
     }
 
     void display_vec(std::ostream& out, expr_ref_vector const& v) const {
-        for (unsigned i = 0; i < v.size(); ++i) {
-	    out << mk_pp(v[i], m) << " ";
-        }
+        for (unsigned i = 0; i < v.size(); ++i)
+            out << mk_pp(v[i], m) << " ";
         out << "\n";
     }
 
 
     void display_vec(std::ostream& out, ptr_vector<expr> const& v) const {
-        for (unsigned i = 0; i < v.size(); ++i) {
-	    out << mk_pp(v[i], m) << " ";
-        }
+        for (unsigned i = 0; i < v.size(); ++i)
+            out << mk_pp(v[i], m) << " ";
         out << "\n";
     }
 
@@ -218,9 +211,6 @@ lbool mus::get_mus(unsigned_vector& mus) {
     return m_imp->get_mus(mus);
 }
 
-void mus::set_cancel(bool f) {
-    m_imp->set_cancel(f);
-}
 
 void mus::reset() {
     m_imp->reset();

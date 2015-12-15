@@ -225,7 +225,7 @@ sig
     val erase : ast_map -> ast -> unit
     val reset : ast_map -> unit
     val get_size : ast_map -> int
-    val get_keys : ast_map -> Expr.expr list
+    val get_keys : ast_map -> ast list
     val to_string : ast_map -> string
   end
   val hash : ast -> int
@@ -352,7 +352,7 @@ end = struct
 	
     let get_keys ( x : ast_map ) =
       let av = ASTVector.create (z3obj_gc x) (Z3native.ast_map_keys (z3obj_gnc x) (z3obj_gno x)) in
-      (ASTVector.to_expr_list av)
+      (ASTVector.to_list av)
 
     let to_string ( x : ast_map ) =
       Z3native.ast_map_to_string (z3obj_gnc x) (z3obj_gno x)
@@ -813,16 +813,26 @@ end = struct
       let s = Z3native.get_sort (context_gno ctx) no in
       let sk = (sort_kind_of_int (Z3native.get_sort_kind (context_gno ctx) s)) in
       if (Z3native.is_algebraic_number (context_gno ctx) no) then
-	Expr(z3_native_object_of_ast_ptr ctx no)
+		Expr(z3_native_object_of_ast_ptr ctx no)
       else
-	if (Z3native.is_numeral_ast (context_gno ctx) no) then
-	  if (sk == INT_SORT || sk == REAL_SORT || sk == BV_SORT || 
-			sk == FLOATING_POINT_SORT || sk == ROUNDING_MODE_SORT) then
-	    Expr(z3_native_object_of_ast_ptr ctx no)
-	  else
-	    raise (Z3native.Exception "Unsupported numeral object")
-	else	  
-	  Expr(z3_native_object_of_ast_ptr ctx no)
+		if (Z3native.is_numeral_ast (context_gno ctx) no) then
+		  match sk with
+		  | REAL_SORT 
+		  | BOOL_SORT 
+		  | ARRAY_SORT 
+		  | BV_SORT 
+		  | ROUNDING_MODE_SORT 
+		  | RELATION_SORT 
+		  | UNINTERPRETED_SORT 
+		  | FLOATING_POINT_SORT 
+		  | INT_SORT 
+		  | DATATYPE_SORT 
+		  | FINITE_DOMAIN_SORT ->
+			 Expr(z3_native_object_of_ast_ptr ctx no)
+		  | _ -> 
+			 raise (Z3native.Exception "Unsupported numeral object")
+		else	  
+		  Expr(z3_native_object_of_ast_ptr ctx no)
 
   let expr_of_ast a = 
     let q = (Z3enums.ast_kind_of_int (Z3native.get_ast_kind (z3obj_gnc a) (z3obj_gno a))) in
@@ -1217,6 +1227,9 @@ struct
 
   let mk_term_array  ( ctx : context ) ( arg : expr ) =
     expr_of_ptr ctx (Z3native.mk_array_default (context_gno ctx) (Expr.gno arg))
+
+  let mk_array_ext ( ctx : context) ( arg1 : expr ) ( arg2 : expr ) =
+	expr_of_ptr ctx (Z3native.mk_array_ext (context_gno ctx) (Expr.gno arg1) (Expr.gno arg2))
 end
 
 
@@ -1532,7 +1545,6 @@ end
 module Arithmetic =
 struct
   let is_int ( x : expr ) =
-    (Z3native.is_numeral_ast (Expr.gnc x) (Expr.gno x)) &&
       ((sort_kind_of_int (Z3native.get_sort_kind (Expr.gnc x) (Z3native.get_sort (Expr.gnc x) (Expr.gno x)))) == INT_SORT)
       
   let is_arithmetic_numeral ( x : expr ) = (AST.is_app (Expr.ast_of_expr x)) && (FuncDecl.get_decl_kind (Expr.get_func_decl x) == OP_ANUM)
@@ -2740,10 +2752,13 @@ struct
     mk_solver ctx (Some (Symbol.mk_string ctx logic))
 
   let mk_simple_solver ( ctx : context ) =
-    (create ctx (Z3native.mk_simple_solver (context_gno ctx)))
+    create ctx (Z3native.mk_simple_solver (context_gno ctx))
 
   let mk_solver_t ( ctx : context ) ( t : Tactic.tactic ) = 
-    (create ctx (Z3native.mk_solver_from_tactic (context_gno ctx) (z3obj_gno t)))
+    create ctx (Z3native.mk_solver_from_tactic (context_gno ctx) (z3obj_gno t))
+
+  let translate  ( x : solver ) ( to_ctx : context ) =
+	create to_ctx (Z3native.solver_translate (z3obj_gnc x) (z3obj_gno x) (context_gno to_ctx))
 
   let to_string ( x : solver ) = Z3native.solver_to_string (z3obj_gnc x) (z3obj_gno x)
 end

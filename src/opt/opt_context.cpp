@@ -137,6 +137,7 @@ namespace opt {
         params_ref p;
         p.set_bool("model", true);
         p.set_bool("unsat_core", true);
+        p.set_bool("elim_to_real", true);
         updt_params(p);
     }
 
@@ -164,6 +165,10 @@ namespace opt {
         reset_maxsmts();
         m_optsmt.reset();        
         m_hard_constraints.reset();
+    }
+
+    void context::get_labels(svector<symbol> & r) {
+        r.append(m_labels);
     }
 
     void context::set_hard_constraints(ptr_vector<expr>& fmls) {
@@ -227,6 +232,7 @@ namespace opt {
         TRACE("opt", tout << "initial search result: " << is_sat << "\n";);
         if (is_sat != l_false) {
             s.get_model(m_model);
+            s.get_labels(m_labels);
         }
         if (is_sat != l_true) {
             return is_sat;
@@ -235,27 +241,37 @@ namespace opt {
         TRACE("opt", model_smt2_pp(tout, m, *m_model, 0););
         m_optsmt.setup(*m_opt_solver.get());
         update_lower();
+        
         switch (m_objectives.size()) {
         case 0:
-            return is_sat;
+            break;
         case 1:
-            return execute(m_objectives[0], true, false);
+            is_sat = execute(m_objectives[0], true, false);
+            break;
         default: {
             opt_params optp(m_params);
             symbol pri = optp.priority();
             if (pri == symbol("pareto")) {
-                return execute_pareto();
+                is_sat = execute_pareto();
             }
             else if (pri == symbol("box")) {
-                return execute_box();
+                is_sat = execute_box();
             }
             else {
-                return execute_lex();
+                is_sat = execute_lex();
             }
+            break;
         }
         }
+        return adjust_unknown(is_sat);
     }
 
+    lbool context::adjust_unknown(lbool r) {
+        if (r == l_true && m_opt_solver.get() && m_opt_solver->was_unknown()) {
+            r = l_undef;
+        }
+        return r;
+    }
 
     bool context::print_model() const {
         opt_params optp(m_params);
@@ -275,11 +291,6 @@ namespace opt {
         }
     }
 
-    void context::set_model(model_ref& mdl) {
-        m_model = mdl;
-        fix_model(mdl);
-    }
-
     void context::get_model(model_ref& mdl) {
         mdl = m_model;
         fix_model(mdl);
@@ -288,7 +299,7 @@ namespace opt {
     lbool context::execute_min_max(unsigned index, bool committed, bool scoped, bool is_max) {
         if (scoped) get_solver().push();            
         lbool result = m_optsmt.lex(index, is_max);
-        if (result == l_true) m_optsmt.get_model(m_model);
+        if (result == l_true) m_optsmt.get_model(m_model, m_labels);
         if (scoped) get_solver().pop(1);        
         if (result == l_true && committed) m_optsmt.commit_assignment(index);
         return result;
@@ -299,7 +310,7 @@ namespace opt {
         maxsmt& ms = *m_maxsmts.find(id);
         if (scoped) get_solver().push();            
         lbool result = ms();
-        if (result != l_false && (ms.get_model(tmp), tmp.get())) ms.get_model(m_model);
+        if (result != l_false && (ms.get_model(tmp, m_labels), tmp.get())) ms.get_model(m_model, m_labels);
         if (scoped) get_solver().pop(1);
         if (result == l_true && committed) ms.commit_assignment();
         return result;
@@ -452,7 +463,7 @@ namespace opt {
     }
 
     void context::yield() {
-        m_pareto->get_model(m_model);
+        m_pareto->get_model(m_model, m_labels);
         update_bound(true);
         update_bound(false);
     }
@@ -661,7 +672,7 @@ namespace opt {
             g->assert_expr(fmls[i].get());
         }
         tactic_ref tac0 = 
-            and_then(mk_simplify_tactic(m), 
+            and_then(mk_simplify_tactic(m, m_params), 
                      mk_propagate_values_tactic(m),
                      mk_solve_eqs_tactic(m),
                      // NB: mk_elim_uncstr_tactic(m) is not sound with soft constraints
@@ -769,7 +780,7 @@ namespace opt {
                   tout << "offset: " << offset << "\n";
                   );
             std::ostringstream out;
-            out << mk_pp(orig_term, m);
+            out << mk_pp(orig_term, m) << ":" << index;
             id = symbol(out.str().c_str());
             return true;
         }
@@ -792,7 +803,7 @@ namespace opt {
             }
             neg = true;
             std::ostringstream out;
-            out << mk_pp(orig_term, m);
+            out << mk_pp(orig_term, m) << ":" << index;
             id = symbol(out.str().c_str());
             return true;
         }
@@ -811,7 +822,7 @@ namespace opt {
             }
             neg = is_max;
             std::ostringstream out;
-            out << mk_pp(orig_term, m);
+            out << mk_pp(orig_term, m) << ":" << index;
             id = symbol(out.str().c_str());
             return true;            
         }
@@ -899,6 +910,21 @@ namespace opt {
             }
             else {
                 m_hard_constraints.push_back(fml);
+            }
+        }
+        // fix types of objectives:
+        for (unsigned i = 0; i < m_objectives.size(); ++i) {
+            objective & obj = m_objectives[i];
+            expr* t = obj.m_term;
+            switch(obj.m_type) {
+            case O_MINIMIZE:
+            case O_MAXIMIZE:
+                if (!m_arith.is_int(t) && !m_arith.is_real(t)) {
+                    obj.m_term = m_arith.mk_numeral(rational(0), true);
+                }
+                break;
+            default:
+                break;
             }
         }
     }
@@ -999,7 +1025,10 @@ namespace opt {
             switch(obj.m_type) {
             case O_MINIMIZE: {
                 app_ref tmp(m);
-                tmp = m_arith.mk_uminus(obj.m_term);
+                tmp = obj.m_term;
+                if (m_arith.is_int(tmp) || m_arith.is_real(tmp)) {
+                    tmp = m_arith.mk_uminus(obj.m_term);
+                }
                 obj.m_index = m_optsmt.add(tmp);
                 break;
             }
@@ -1102,16 +1131,20 @@ namespace opt {
     }
 
     void context::display_assignment(std::ostream& out) {
+        out << "(objectives\n";
         for (unsigned i = 0; i < m_scoped_state.m_objectives.size(); ++i) {
             objective const& obj = m_scoped_state.m_objectives[i];
+            out << " (";
             display_objective(out, obj);
             if (get_lower_as_num(i) != get_upper_as_num(i)) {
-                out << " |-> [" << get_lower(i) << ":" << get_upper(i) << "]\n";
+                out << "  (" << get_lower(i) << " " << get_upper(i) << ")";
             }
             else {
-                out << " |-> " << get_lower(i) << "\n";
+                out << " " << get_lower(i);
             }
+            out << ")\n";
         }
+        out << ")\n";
     }
 
     void context::display_objective(std::ostream& out, objective const& obj) const {
@@ -1226,26 +1259,6 @@ namespace opt {
         }
     }
 
-    void context::set_cancel(bool f) {
-        #pragma omp critical (opt_context)
-        {
-            if (m_solver) {
-                if (f) m_solver->cancel(); else m_solver->reset_cancel();
-            }
-            if (m_pareto) {
-                m_pareto->set_cancel(f);
-            }
-            if (m_simplify) {
-                if (f) m_simplify->cancel(); else m_solver->reset_cancel();
-            }
-            map_t::iterator it = m_maxsmts.begin(), end = m_maxsmts.end();
-            for (; it != end; ++it) {
-                it->m_value->set_cancel(f);
-            }            
-        }
-        m_optsmt.set_cancel(f);
-    }
-
     void context::collect_statistics(statistics& stats) const {
         if (m_solver) {
             m_solver->collect_statistics(stats);
@@ -1258,13 +1271,14 @@ namespace opt {
             it->m_value->collect_statistics(stats);
         }        
         get_memory_statistics(stats);
+        get_rlimit_statistics(m.limit(), stats);
     }
 
     void context::collect_param_descrs(param_descrs & r) {
         opt_params::collect_param_descrs(r);
     }
     
-    void context::updt_params(params_ref& p) {
+    void context::updt_params(params_ref const& p) {
         m_params.append(p);
         if (m_solver) {
             m_solver->updt_params(m_params);

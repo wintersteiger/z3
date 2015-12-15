@@ -44,6 +44,7 @@ Revision History:
 #include"chashtable.h"
 #include"z3_exception.h"
 #include"dependency.h"
+#include"rlimit.h"
 
 #define RECYCLE_FREE_AST_INDICES
 
@@ -522,7 +523,7 @@ public:
 /**
    The ids of expressions and declarations are in different ranges. 
 */
-const unsigned c_first_decl_id = (1 << 31);
+const unsigned c_first_decl_id = (1u << 31u);
 
 /**
    \brief Superclass for function declarations and sorts.
@@ -931,7 +932,6 @@ public:
     virtual ~decl_plugin() {}
     virtual void finalize() {}
 
-    virtual void set_cancel(bool f) {}
 
     virtual decl_plugin * mk_fresh() = 0;
 
@@ -1145,7 +1145,7 @@ typedef app proof; /* a proof is just an applicaton */
 
 enum label_op_kind {
     OP_LABEL,
-    OP_LABEL_LIT,
+    OP_LABEL_LIT
 };
 
 /**
@@ -1424,6 +1424,7 @@ public:
     void show_id_gen();
 
 protected:
+    reslimit                  m_limit;
     small_object_allocator    m_alloc;
     family_manager            m_family_manager;
     expr_array_manager        m_expr_array_manager;
@@ -1470,9 +1471,6 @@ public:
     ~ast_manager();
 
     // propagate cancellation signal to decl_plugins
-    void set_cancel(bool f);
-    void cancel() { set_cancel(true); }
-    void reset_cancel() { set_cancel(false); }
 
     bool has_trace_stream() const { return m_trace_stream != 0; }
     std::ostream & trace_stream() { SASSERT(has_trace_stream()); return *m_trace_stream; }
@@ -1518,6 +1516,9 @@ public:
             fid == m_model_value_family_id ||
             fid == m_user_sort_family_id; 
     }
+
+    reslimit& limit() { return m_limit; }
+    bool canceled() { return !limit().inc(); }
 
     void register_plugin(symbol const & s, decl_plugin * plugin);
     
@@ -2009,6 +2010,7 @@ public:
     app * mk_distinct_expanded(unsigned num_args, expr * const * args);
     app * mk_true() { return m_true; }
     app * mk_false() { return m_false; }
+    app * mk_bool_val(bool b) { return b?m_true:m_false; }
     app * mk_interp(expr * arg) { return mk_app(m_basic_family_id, OP_INTERP, arg); }
 
 

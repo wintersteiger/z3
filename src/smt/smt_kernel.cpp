@@ -32,6 +32,10 @@ namespace smt {
             m_params(p) {
         }
 
+        static void copy(imp& src, imp& dst) {
+            context::copy(src.m_kernel, dst.m_kernel);
+        }
+
         smt_params & fparams() {
             return m_kernel.get_fparams();
         }
@@ -165,10 +169,6 @@ namespace smt {
         void display_istatistics(std::ostream & out) const {
             m_kernel.display_istatistics(out);
         }
-
-        void set_cancel(bool f) {
-            m_kernel.set_cancel_flag(f);
-        }
         
         bool canceled() {
             return m_kernel.get_cancel_flag();
@@ -192,6 +192,11 @@ namespace smt {
     ast_manager & kernel::m() const {
         return m_imp->m();
     }
+
+    void  kernel::copy(kernel& src, kernel& dst) {
+        imp::copy(*src.m_imp, *dst.m_imp);
+    }
+
 
     bool kernel::set_logic(symbol logic) {
         return m_imp->set_logic(logic);
@@ -317,14 +322,6 @@ namespace smt {
 
     void kernel::display_istatistics(std::ostream & out) const {
         m_imp->display_istatistics(out);
-    }
-
-    void kernel::set_cancel(bool f) {
-        #pragma omp critical (smt_kernel)
-        {
-            if (m_imp)
-                m_imp->set_cancel(f);
-        }
     }
 
     bool kernel::canceled() const {

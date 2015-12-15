@@ -1283,6 +1283,21 @@ namespace smt {
         theory::reset_eh();
     }
 
+    bool theory_bv::include_func_interp(func_decl* f) {
+        SASSERT(f->get_family_id() == get_family_id());
+        switch (f->get_decl_kind()) {
+        case OP_BSDIV0:
+        case OP_BUDIV0:
+        case OP_BSREM0:
+        case OP_BUREM0:       
+        case OP_BSMOD0:        
+            return true;
+        default:
+            return false;
+        }
+        return false;
+    }
+
     theory_bv::theory_bv(ast_manager & m, theory_bv_params const & params, bit_blaster_params const & bb_params):
         theory(m.mk_family_id("bv")),
         m_params(params),
@@ -1297,6 +1312,11 @@ namespace smt {
 
     theory_bv::~theory_bv() {
     }
+
+    theory* theory_bv::mk_fresh(context* new_ctx) {
+        return alloc(theory_bv, new_ctx->get_manager(), m_params, m_bb.get_params()); 
+    }
+
     
     void theory_bv::merge_eh(theory_var r1, theory_var r2, theory_var v1, theory_var v2) {
         TRACE("bv", tout << "merging: #" << get_enode(v1)->get_owner_id() << " #" << get_enode(v2)->get_owner_id() << "\n";);
@@ -1566,8 +1586,9 @@ namespace smt {
     }
 
     void theory_bv::display(std::ostream & out) const {
-        out << "Theory bv:\n";
         unsigned num_vars = get_num_vars();
+        if (num_vars == 0) return;
+        out << "Theory bv:\n";
         for (unsigned v = 0; v < num_vars; v++) {
             display_var(out, v);
         }

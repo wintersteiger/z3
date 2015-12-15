@@ -37,6 +37,12 @@ namespace smt {
             if (m_logic != symbol::null)
                 m_context.set_logic(m_logic);
         }
+
+        virtual solver* translate(ast_manager& m, params_ref const& p) {            
+            solver* result = alloc(solver, m, p, m_logic);
+            smt::kernel::copy(m_context, result->m_context);
+            return result;
+        }
         
         virtual ~solver() {
         }
@@ -95,9 +101,8 @@ namespace smt {
             r.append(tmp.size(), tmp.c_ptr());
         }
 
-        virtual void set_cancel(bool f) {
-            m_context.set_cancel(f);
-        }
+        virtual ast_manager& get_manager() { return m_context.m(); }
+
 
         virtual void set_progress_callback(progress_callback * callback) {
             m_callback = callback;

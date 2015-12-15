@@ -79,7 +79,6 @@ namespace smt {
         smt_params &                m_fparams;
         params_ref                  m_params;
         setup                       m_setup;
-        volatile bool               m_cancel_flag;
         timer                       m_timer;
         asserted_formulas           m_asserted_formulas;
         scoped_ptr<quantifier_manager>   m_qmanager;
@@ -233,9 +232,8 @@ namespace smt {
             return m_params;
         }
 
-        virtual void set_cancel_flag(bool f = true);
 
-        bool get_cancel_flag() { return m_cancel_flag; }
+        bool get_cancel_flag() { return !m_manager.limit().inc(); }
 
         region & get_region() {
             return m_region;
@@ -1237,6 +1235,8 @@ namespace smt {
 
         void display_profile(std::ostream & out) const;
 
+        void display(std::ostream& out, b_justification j) const;
+
         // -----------------------------------
         //
         // Debugging support
@@ -1315,7 +1315,7 @@ namespace smt {
         bool already_internalized_theory_core(theory * th, expr_ref_vector const & s) const;
 #endif
         bool check_preamble(bool reset_cancel);
-        void check_finalize(lbool r);
+        lbool check_finalize(lbool r);
 
         // -----------------------------------
         //
@@ -1324,8 +1324,17 @@ namespace smt {
         // -----------------------------------
         void assert_expr_core(expr * e, proof * pr);
 
+        // copy plugins into a fresh context.
+        void copy_plugins(context& src, context& dst);
+
+        static literal translate_literal(
+            literal lit, context& src_ctx, context& dst_ctx,
+            vector<bool_var> b2v, ast_translation& tr);
+
+
     public:
         context(ast_manager & m, smt_params & fp, params_ref const & p = params_ref());
+
 
         virtual ~context();
 
@@ -1337,6 +1346,12 @@ namespace smt {
            If p == 0, then this->m_params is used
         */
         context * mk_fresh(symbol const * l = 0,  smt_params * p = 0);
+
+        static void copy(context& src, context& dst);
+
+        /**
+           \brief Translate context to use new manager m.
+         */
 
         app * mk_eq_atom(expr * lhs, expr * rhs);
 

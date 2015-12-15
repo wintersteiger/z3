@@ -92,7 +92,7 @@ namespace smt2 {
     scanner::token scanner::read_symbol_core() {
         while (true) {
             char c = curr();
-            char n = m_normalized[static_cast<unsigned char>(c)];
+            signed char n = m_normalized[static_cast<unsigned char>(c)];
             if (n == 'a' || n == '0' || n == '-') {
                 m_string.push_back(c);
                 next();
@@ -171,11 +171,14 @@ namespace smt2 {
                 throw scanner_exception("unexpected end of string", m_line, m_spos);
             if (c == '\"') {
                 next();
-                m_string.push_back(0);
-                return STRING_TOKEN;
+                if (curr() != '\"') {
+                    m_string.push_back(0);
+                    return STRING_TOKEN;
+                }
             }
-            if (c == '\n')
+            else if (c == '\n') {
                 new_line();
+            }
             else if (c == '\\') {
                 next();
                 c = curr();
@@ -257,7 +260,7 @@ namespace smt2 {
         m_smtlib2_compliant = ctx.params().m_smtlib2_compliant;
 
         for (int i = 0; i < 256; ++i) {
-            m_normalized[i] = (char) i;
+            m_normalized[i] = (signed char) i;
         }
         m_normalized[static_cast<int>('\t')] = ' ';
         m_normalized[static_cast<int>('\r')] = ' ';
