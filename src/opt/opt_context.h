@@ -174,9 +174,6 @@ namespace opt {
         virtual void push();
         virtual void pop(unsigned n);
         virtual bool empty() { return m_scoped_state.m_objectives.empty(); }
-        virtual void set_cancel(bool f);
-        virtual void reset_cancel() { set_cancel(false); }
-        virtual void cancel() { set_cancel(true); }
         virtual void set_hard_constraints(ptr_vector<expr> & hard);
         virtual lbool optimize();
         virtual bool print_model() const;
@@ -195,7 +192,7 @@ namespace opt {
 
         void display(std::ostream& out);
         static void collect_param_descrs(param_descrs & r);
-        void updt_params(params_ref& p);
+        virtual void updt_params(params_ref const& p);
         params_ref& get_params() { return m_params; }
 
         expr_ref get_lower(unsigned idx);

@@ -1259,26 +1259,6 @@ namespace opt {
         }
     }
 
-    void context::set_cancel(bool f) {
-        #pragma omp critical (opt_context)
-        {
-            if (m_solver) {
-                if (f) m_solver->cancel(); else m_solver->reset_cancel();
-            }
-            if (m_pareto) {
-                m_pareto->set_cancel(f);
-            }
-            if (m_simplify) {
-                if (f) m_simplify->cancel(); else m_solver->reset_cancel();
-            }
-            map_t::iterator it = m_maxsmts.begin(), end = m_maxsmts.end();
-            for (; it != end; ++it) {
-                it->m_value->set_cancel(f);
-            }            
-        }
-        m_optsmt.set_cancel(f);
-    }
-
     void context::collect_statistics(statistics& stats) const {
         if (m_solver) {
             m_solver->collect_statistics(stats);
@@ -1298,7 +1278,7 @@ namespace opt {
         opt_params::collect_param_descrs(r);
     }
     
-    void context::updt_params(params_ref& p) {
+    void context::updt_params(params_ref const& p) {
         m_params.append(p);
         if (m_solver) {
             m_solver->updt_params(m_params);

@@ -1017,7 +1017,6 @@ namespace pdr {
         TRACE("pdr_verbose", tout << "remove: " << n.level() << ": " << &n << " " << n.state() << "\n";);
         model_nodes& nodes = cache(n).find(n.state());
         nodes.erase(&n);
-        bool is_goal = n.is_goal();
         remove_goal(n);
         // TBD: siblings would also fail if n is not a goal.
         if (!nodes.empty() && backtrack && nodes[0]->children().empty() && nodes[0]->is_closed()) {
@@ -1453,8 +1452,7 @@ namespace pdr {
           m_search(m_params.pdr_bfs_model_search()),
           m_last_result(l_undef),
           m_inductive_lvl(0),
-          m_expanded_lvl(0),
-          m_cancel(false)
+          m_expanded_lvl(0)
     {
     }
 
@@ -1465,7 +1463,6 @@ namespace pdr {
 
     void context::reset() {
         TRACE("pdr", tout << "\n";);
-        cleanup();
         decl2rel::iterator it = m_rels.begin(), end = m_rels.end();
         for (; it != end; ++it) {
             dealloc(it->m_value);
@@ -1912,16 +1909,8 @@ namespace pdr {
         return l_undef;
     }
 
-    void context::cancel() {
-        m_cancel = true;
-    }
-
-    void context::cleanup() {
-        m_cancel = false;
-    }
-
     void context::checkpoint() {
-        if (m_cancel) {
+        if (m.canceled()) {
             throw default_exception("pdr canceled");
         }
     }
