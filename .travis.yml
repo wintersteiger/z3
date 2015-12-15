@@ -24,7 +24,7 @@ install:
 	  brew install ocaml ;
     fi
 
-before_script: 
+before_script:
   - git clone https://github.com/wintersteiger/z3test.git z3test --branch build-ng
 
 env: true
