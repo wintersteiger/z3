@@ -37,8 +37,10 @@ script:
   - export Z3DIR=`pwd`
   - cd z3test
   - python scripts/smalltest.py
-  - cd ..
-  - python scripts/mk_unix_dist.py --githash
+  - if [[ "$?" == "0" ]]; then
+      cd ..	;
+	  python scripts/mk_unix_dist.py --githash ;
+	fi
 
 after_success: true
 
