@@ -5,7 +5,7 @@ os:
   - osx
 
 jdk:
-  - oraclejdk8
+  - openjdk7
   
 compiler:
   - gcc
@@ -16,18 +16,18 @@ before_install: true
 install:
   - if [[ $TRAVIS_OS_NAME == "linux" ]]; then
       sudo apt-get install python ;
-      sudo apt-get install ocaml ;
-    fi
-  - if [[ $TRAVIS_OS_NAME == "osx" ]]; then
+      sudo apt-get install ocaml ocaml-findlib;
+    elif [[ $TRAVIS_OS_NAME == "osx" ]]; then
       brew update ;
       brew install gcc ;
       brew install python ;
+	  brew install ocaml ;
     fi
 
 before_script: 
   - git clone https://github.com/wintersteiger/z3test.git z3test --branch build-ng
 
-env: MAKEJOBS=4
+env: true
 
 script:
   - git rev-parse --abbrev-ref HEAD
