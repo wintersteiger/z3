@@ -21,7 +21,7 @@ install:
       brew update ;
       brew install gcc ;
       brew install python ;
-	  brew install ocaml ;
+      brew install ocaml ;
     fi
 
 before_script:
@@ -38,9 +38,9 @@ script:
   - cd z3test
   - python scripts/smalltest.py
   - if [[ "$?" == "0" ]]; then
-      cd ..	;
-	  python scripts/mk_unix_dist.py --githash ;
-	fi
+      cd ..    ;
+      python scripts/mk_unix_dist.py --githash ;
+    fi
 
 after_success: true
 
