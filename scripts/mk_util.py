@@ -35,7 +35,7 @@ OCAMLOPT=getenv("OCAMLOPT", "ocamlopt")
 OCAML_LIB=getenv("OCAML_LIB", None)
 OCAMLFIND=getenv("OCAMLFIND", "ocamlfind")
 CSC=getenv("CSC", None)
-GACUTIL=getenv("GACUTIL", None)
+GACUTIL=getenv("GACUTIL", 'gacutil')
 # Standard install directories relative to PREFIX
 INSTALL_BIN_DIR=getenv("Z3_INSTALL_BIN_DIR", "bin")
 INSTALL_LIB_DIR=getenv("Z3_INSTALL_LIB_DIR", "lib")
@@ -44,6 +44,7 @@ INSTALL_PKGCONFIG_DIR=getenv("Z3_INSTALL_PKGCONFIG_DIR", os.path.join(INSTALL_LI
 
 CXX_COMPILERS=['g++', 'clang++']
 C_COMPILERS=['gcc', 'clang']
+CSC_COMPILERS=['csc', 'mcs']
 JAVAC=None
 JAR=None
 PYTHON_PACKAGE_DIR=distutils.sysconfig.get_python_lib()
@@ -75,7 +76,7 @@ ONLY_MAKEFILES = False
 Z3PY_SRC_DIR=None
 VS_PROJ = False
 TRACE = False
-DOTNET_ENABLED=True
+DOTNET_ENABLED=False
 JAVA_ENABLED=False
 ML_ENABLED=False
 PYTHON_INSTALL_ENABLED=True
@@ -397,42 +398,36 @@ def check_java():
         if JNI_HOME is None:
             raise MKException("Failed to detect jni.h. Possible solution: set JNI_HOME with the path to JDK.")
 
+def test_csc_compiler(c):
+    t = TempFile('hello.cs')
+    t.add('public class hello { public static void Main() {} }')
+    t.commit()
+    if is_verbose():
+        print ('Testing %s...' % c)
+    r = exec_cmd([c, 'hello.cs'])
+    try:
+        rmf('hello.cs')
+        rmf('hello.exe')
+    except:
+        pass
+    return r == 0
+
 def check_dotnet():
     global CSC, GACUTIL
-    if IS_WINDOWS:
-        # Apparently building the dotnet bindings worked fine before
-        # so don't bother to try to detect anything
-        # FIXME: Shouldn't we be checking the supported version of .NET
-        # or something!?
-        if CSC == None:
-            CSC='csc.exe'
-        return
 
-    # Check for the mono compiler
     if CSC == None:
-        monoCompilerExecutable = 'mcs'
-    else:
-        monoCompilerExecutable = CSC
-    monoCompilerPath = which(monoCompilerExecutable)
-    if monoCompilerPath == None:
-        disable_dotnet()
-        print(("Could not find mono compiler ({}) in your PATH. Not building .NET bindings").format(
-              monoCompilerExecutable))
-        return
-    CSC = monoCompilerPath
+        for c in CSC_COMPILERS:
+            if test_csc_compiler(c):
+                CSC = c
 
-    # Check for gacutil (needed to install the dotnet bindings)
-    if GACUTIL == None:
-        gacutilExecutable = 'gacutil'
-    else:
-        gacutilExecutable = GACUTIL
-    gacutilPath = which(gacutilExecutable)
-    if gacutilPath == None:
-        print(("ERROR: Could not find the gacutil ({}) in your PATH. "
-               "Either install it or disable building the dotnet bindings.").format(
-               gacutilExecutable))
-        sys.exit(1)
-    GACUTIL = gacutilPath
+    if CSC == None:
+        raise MKException('Failed testing C# compiler. Set environment variable CSC with the path to the C# compiler')
+
+    if is_verbose():
+        print ('Testing %s...' % GACUTIL)
+    r = exec_cmd([GACUTIL, '/l', 'hello' ])
+    if r != 0:
+        raise MKException('Failed testing gacutil. Set environment variable GACUTIL with the path to gacutil.')
 
 def check_ml():
     t = TempFile('hello.ml')
@@ -612,10 +607,10 @@ def display_help(exit_code):
     print("  -m, --makefiles               generate only makefiles.")
     if IS_WINDOWS:
         print("  -v, --vsproj                  generate Visual Studio Project Files.")
-    print("  -n, --nodotnet                do not generate Microsoft.Z3.dll make rules.")
     if IS_WINDOWS:
         print("  --optimize                    generate optimized code during linking.")
-    print("  -j, --java                    generate Java bindings.")
+    print("  --dotnet                      generate .NET bindings.")
+    print("  --java                        generate Java bindings.")
     print("  --ml                          generate OCaml bindings.")
     print("  --staticlib                   build Z3 static library.")
     if not IS_WINDOWS:
@@ -636,8 +631,8 @@ def display_help(exit_code):
     print("  OCAMLC     Ocaml byte-code compiler (only relevant with --ml)")
     print("  OCAMLOPT   Ocaml native compiler (only relevant with --ml)")
     print("  OCAML_LIB  Ocaml library directory (only relevant with --ml)")
-    print("  CSC        C# Compiler (only relevant if dotnet bindings are enabled)")
-    print("  GACUTIL    GAC Utility (only relevant if dotnet bindings are enabled)")
+    print("  CSC        C# Compiler (only relevant if .NET bindings are enabled)")
+    print("  GACUTIL    GAC Utility (only relevant if .NET bindings are enabled)")
     print("  Z3_INSTALL_BIN_DIR Install directory for binaries relative to install prefix")
     print("  Z3_INSTALL_LIB_DIR Install directory for libraries relative to install prefix")
     print("  Z3_INSTALL_INCLUDE_DIR Install directory for header files relative to install prefix")
@@ -648,12 +643,12 @@ def display_help(exit_code):
 def parse_options():
     global VERBOSE, DEBUG_MODE, IS_WINDOWS, VS_X64, ONLY_MAKEFILES, SHOW_CPPS, VS_PROJ, TRACE, VS_PAR, VS_PAR_NUM
     global DOTNET_ENABLED, JAVA_ENABLED, ML_ENABLED, STATIC_LIB, PREFIX, GMP, FOCI2, FOCI2LIB, PYTHON_PACKAGE_DIR, GPROF, GIT_HASH
-    global LINUX_X64, SLOW_OPTIMIZE, USE_OMP, PYTHON_INSTALL_ENABLED
+    global LINUX_X64, SLOW_OPTIMIZE, USE_OMP
     try:
         options, remainder = getopt.gnu_getopt(sys.argv[1:],
                                                'b:df:sxhmcvtnp:gj',
                                                ['build=', 'debug', 'silent', 'x64', 'help', 'makefiles', 'showcpp', 'vsproj',
-                                                'trace', 'nodotnet', 'staticlib', 'prefix=', 'gmp', 'foci2=', 'java', 'parallel=', 'gprof',
+                                                'trace', 'dotnet', 'staticlib', 'prefix=', 'gmp', 'foci2=', 'java', 'parallel=', 'gprof',
                                                 'githash=', 'x86', 'ml', 'optimize', 'noomp', 'pypkgdir='])
     except:
         print("ERROR: Invalid command line option")
@@ -685,8 +680,8 @@ def parse_options():
             VS_PROJ = True
         elif opt in ('-t', '--trace'):
             TRACE = True
-        elif opt in ('-n', '--nodotnet'):
-            DOTNET_ENABLED = False
+        elif opt in ('-.net', '--dotnet'):
+            DOTNET_ENABLED = True
         elif opt in ('--staticlib'):
             STATIC_LIB = True
         elif opt in ('--optimize'):
@@ -716,26 +711,7 @@ def parse_options():
         else:
             print("ERROR: Invalid command line option '%s'" % opt)
             display_help(1)
-    # Handle the Python package directory
-    if IS_WINDOWS:
-        # Installing under Windows doesn't make sense as the install prefix is used
-        # but that doesn't make sense under Windows
-        PYTHON_INSTALL_ENABLED = False
-    else:
-        if not PYTHON_PACKAGE_DIR.startswith(PREFIX):
-            print(("Warning: The detected Python package directory (%s)"
-                   " does not live under the installation prefix (%s)"
-                   ". This would lead to a broken Python installation."
-                   "Use --pypkgdir= to change the Python package directory") %
-                  (PYTHON_PACKAGE_DIR, PREFIX))
-            if IS_OSX and PYTHON_PACKAGE_DIR.startswith('/Library/'):
-                print("Using hack to install Python bindings, this might lead to a broken system")
-                PYTHON_INSTALL_ENABLED = True
-            else:
-                print("Disabling install of Python bindings")
-                PYTHON_INSTALL_ENABLED = False
-        else:
-            PYTHON_INSTALL_ENABLED = True
+
 
 # Return a list containing a file names included using '#include' in
 # the given C/C++ file named fname.
@@ -828,10 +804,6 @@ def is_dotnet_enabled():
 
 def is_python_install_enabled():
     return PYTHON_INSTALL_ENABLED
-
-def disable_dotnet():
-    global DOTNET_ENABLED
-    DOTNET_ENABLED = False
 
 def is_compiler(given, expected):
     """
@@ -1045,6 +1017,11 @@ class Component:
     def mk_unix_dist(self, build_path, dist_path):
         return
 
+    # Used to print warnings or errors after mk_make.py is done, so that they
+    # are not quite as easy to miss.
+    def final_info(self):
+        pass
+
 class LibComponent(Component):
     def __init__(self, name, path, deps, includes2install):
         Component.__init__(self, name, path, deps)
@@ -1071,8 +1048,8 @@ class LibComponent(Component):
         out.write('\n')
         out.write('%s: %s\n\n' % (self.name, libfile))
 
-    def mk_install_dep(self, out):
-        out.write('%s' % libfile)
+    def mk_install_deps(self, out):
+        return
 
     def mk_install(self, out):
         for include in self.includes2install:
@@ -1160,8 +1137,10 @@ class ExeComponent(Component):
     def main_component(self):
         return self.install
 
-    def mk_install_dep(self, out):
-        out.write('%s' % exefile)
+    def mk_install_deps(self, out):
+        if self.install:
+            exefile = '%s$(EXE_EXT)' % self.exe_name
+            out.write('%s' % exefile)
 
     def mk_install(self, out):
         if self.install:
@@ -1317,7 +1296,7 @@ class DLLComponent(Component):
     def require_def_file(self):
         return IS_WINDOWS and self.export_files
 
-    def mk_install_dep(self, out):
+    def mk_install_deps(self, out):
         out.write('%s$(SO_EXT)' % self.dll_name)
         if self.static:
             out.write(' %s$(LIB_EXT)' % self.dll_name)
@@ -1354,27 +1333,43 @@ class DLLComponent(Component):
 class PythonInstallComponent(Component):
     def __init__(self, name, libz3Component):
         assert isinstance(libz3Component, DLLComponent)
+        global PYTHON_INSTALL_ENABLED
         Component.__init__(self, name, None, [])
         self.pythonPkgDir = None
         self.in_prefix_install = True
         self.libz3Component = libz3Component
-        if not PYTHON_INSTALL_ENABLED:
-            return
 
-        if self.is_osx_hack():
-            # Use full path that is outside of install prefix
-            self.pythonPkgDir = PYTHON_PACKAGE_DIR
-            self.in_prefix_install = False
-            assert os.path.isabs(self.pythonPkgDir)
+        if IS_WINDOWS:
+            # Installing under Windows doesn't make sense as the install prefix is used
+            # but that doesn't make sense under Windows
+            # CMW: It makes perfectly good sense; the prefix is Python's sys.prefix,
+            # i.e., something along the lines of C:\Python\... At the moment we are not
+            # sure whether we would want to install libz3.dll into that directory though.
+            PYTHON_INSTALL_ENABLED = False
+            return
         else:
-            # Use path inside the prefix (should be the normal case)
+            PYTHON_INSTALL_ENABLED = True
+
+        if IS_WINDOWS or IS_OSX:
+            # Use full path that is possibly outside of install prefix
+            self.in_prefix_install = PYTHON_PACKAGE_DIR.startswith(PREFIX)
+            self.pythonPkgDir = strip_path_prefix(PYTHON_PACKAGE_DIR, PREFIX)
+        else:
+            # Use path inside the prefix (should be the normal case on Linux)
+            # CMW: Also normal on *BSD?
             assert PYTHON_PACKAGE_DIR.startswith(PREFIX)
             self.pythonPkgDir = strip_path_prefix(PYTHON_PACKAGE_DIR, PREFIX)
-            assert not os.path.isabs(self.pythonPkgDir)
-            assert self.in_prefix_install
+            self.in_prefix_install = True
 
-    def is_osx_hack(self):
-        return IS_OSX and not PYTHON_PACKAGE_DIR.startswith(PREFIX)
+        if self.in_prefix_install:
+            assert not os.path.isabs(self.pythonPkgDir)
+
+    def final_info(self):
+        if not PYTHON_PACKAGE_DIR.startswith(PREFIX):
+            print("Warning: The detected Python package directory (%s) is not "
+                  "in the installation prefix (%s). This can lead to a broken "
+                  "Python API installation. Use --pypkgdir= to change the "
+                  "Python package directory." % (PYTHON_PACKAGE_DIR, PREFIX))
 
     def main_component(self):
         return False    
@@ -1385,7 +1380,7 @@ class PythonInstallComponent(Component):
         MakeRuleCmd.make_install_directory(out, self.pythonPkgDir, in_prefix=self.in_prefix_install)
 
         # Sym-link or copy libz3 into python package directory
-        if IS_WINDOWS or self.is_osx_hack():
+        if IS_WINDOWS or IS_OSX:
             MakeRuleCmd.install_files(out,
                                       self.libz3Component.dll_file(),
                                       os.path.join(self.pythonPkgDir,
@@ -1485,7 +1480,7 @@ class DotNetDLLComponent(Component):
         configure_file(pkg_config_template, pkg_config_output, substitutions)
 
     def mk_makefile(self, out):
-        if not DOTNET_ENABLED:
+        if not is_dotnet_enabled():
             return
         cs_fp_files = []
         cs_files    = []
@@ -1535,7 +1530,7 @@ class DotNetDLLComponent(Component):
                            ]
                          )
         if DEBUG_MODE:
-            cscCmdLine.extend( ['/define:DEBUG;TRACE',
+            cscCmdLine.extend( ['"/define:DEBUG;TRACE"', # Needs to be quoted due to ``;`` being a shell command separator
                                 '/debug+',
                                 '/debug:full',
                                 '/optimize-'
@@ -1576,8 +1571,7 @@ class DotNetDLLComponent(Component):
         return True
 
     def mk_win_dist(self, build_path, dist_path):
-        if DOTNET_ENABLED:
-            # Assuming all DotNET dll should be in the distribution
+        if is_dotnet_enabled():
             mk_dir(os.path.join(dist_path, INSTALL_BIN_DIR))
             shutil.copy('%s.dll' % os.path.join(build_path, self.dll_name),
                         '%s.dll' % os.path.join(dist_path, INSTALL_BIN_DIR, self.dll_name))
@@ -1587,14 +1581,16 @@ class DotNetDLLComponent(Component):
                 shutil.copy('%s.pdb' % os.path.join(build_path, self.dll_name),
                             '%s.pdb' % os.path.join(dist_path, INSTALL_BIN_DIR, self.dll_name))
 
-
-
     def mk_unix_dist(self, build_path, dist_path):
-        # Do nothing
-        return
+        if is_dotnet_enabled():
+            mk_dir(os.path.join(dist_path, INSTALL_BIN_DIR))
+            shutil.copy('%s.dll' % os.path.join(build_path, self.dll_name),
+                        '%s.dll' % os.path.join(dist_path, INSTALL_BIN_DIR, self.dll_name))
+            shutil.copy('%s.xml' % os.path.join(build_path, self.dll_name),
+                        '%s.xml' % os.path.join(dist_path, INSTALL_BIN_DIR, self.dll_name))
 
     def mk_install_deps(self, out):
-        if not DOTNET_ENABLED:
+        if not is_dotnet_enabled():
             return
         out.write('%s' % self.name)
 
@@ -1620,7 +1616,7 @@ class DotNetDLLComponent(Component):
             flags=' '.join(gacUtilFlags)))
 
     def mk_install(self, out):
-        if not DOTNET_ENABLED or IS_WINDOWS:
+        if not DOTNET_ENABLED:
             return
         self._install_or_uninstall_to_gac(out, install=True)
 
@@ -1631,7 +1627,7 @@ class DotNetDLLComponent(Component):
         MakeRuleCmd.install_files(out, pkg_config_output, INSTALL_PKGCONFIG_DIR)
 
     def mk_uninstall(self, out):
-        if not DOTNET_ENABLED or IS_WINDOWS:
+        if not DOTNET_ENABLED:
             return
         self._install_or_uninstall_to_gac(out, install=False)
         pkg_config_file = os.path.join('lib','pkgconfig','{}.pc'.format(self.gac_pkg_name()))
@@ -1916,10 +1912,10 @@ class DotNetExampleComponent(ExampleComponent):
         ExampleComponent.__init__(self, name, path)
 
     def is_example(self):
-        return IS_WINDOWS
+        return is_dotnet_enabled()
 
     def mk_makefile(self, out):
-        if DOTNET_ENABLED:
+        if is_dotnet_enabled():
             dll_name = get_component(DOTNET_COMPONENT).dll_name
             dll = '%s.dll' % dll_name
             exefile = '%s$(EXE_EXT)' % self.name
@@ -1935,9 +1931,11 @@ class DotNetExampleComponent(ExampleComponent):
                 out.write(' /platform:x86')
             for csfile in get_cs_files(self.ex_dir):
                 out.write(' ')
-                # HACK
-                win_ex_dir = self.to_ex_dir.replace('/', '\\')
-                out.write(os.path.join(win_ex_dir, csfile))
+                # HACK: I'm not really sure why csc on Windows need to be
+                # given Windows style paths (``\``) here. I thought Windows
+                # supported using ``/`` as a path separator...
+                relative_path = self.to_ex_dir.replace('/', os.path.sep)
+                out.write(os.path.join(relative_path, csfile))
             out.write('\n')
             out.write('_ex_%s: %s\n\n' % (self.name, exefile))
 
@@ -2343,12 +2341,12 @@ def mk_makefile():
             out.write(' %s' % c.name)
     out.write('\n\t@echo Z3 was successfully built.\n')
     out.write("\t@echo \"Z3Py scripts can already be executed in the \'%s\' directory.\"\n" % BUILD_DIR)
-    out.write("\t@echo \"Z3Py scripts stored in arbitrary directories can be also executed if \'%s\' directory is added to the PYTHONPATH environment variable.\"\n" % BUILD_DIR)
+    out.write("\t@echo \"Z3Py scripts stored in arbitrary directories can be executed if the \'%s\' directory is added to the PYTHONPATH environment variable.\"\n" % BUILD_DIR)
     if not IS_WINDOWS:
         out.write("\t@echo Use the following command to install Z3 at prefix $(PREFIX).\n")
         out.write('\t@echo "    sudo make install"\n\n')
-        out.write("\t@echo If you are doing a staged install you can use DESTDIR.\n")
-        out.write('\t@echo "    make DESTDIR=/some/temp/directory install"\n')
+        # out.write("\t@echo If you are doing a staged install you can use DESTDIR.\n")
+        # out.write('\t@echo "    make DESTDIR=/some/temp/directory install"\n')
     # Generate :examples rule
     out.write('examples:')
     for c in get_components():
@@ -2362,6 +2360,8 @@ def mk_makefile():
     if not IS_WINDOWS:
         mk_install(out)
         mk_uninstall(out)
+    for c in get_components():
+        c.final_info()
     out.close()
     # Finalize
     if VERBOSE:
@@ -2548,42 +2548,23 @@ def mk_version_dot_h(major, minor, build, revision):
     if VERBOSE:
         print("Generated '%s'" % os.path.join(c.src_dir, 'version.h'))
 
-# Generate AssemblyInfo.cs files with the right version numbers by using AssemblyInfo files as a template
+# Generate AssemblyInfo.cs files with the right version numbers by using ``AssemblyInfo.cs.in`` files as a template
 def mk_all_assembly_infos(major, minor, build, revision):
     for c in get_components():
         if c.has_assembly_info():
-            assembly = os.path.join(c.src_dir, c.assembly_info_dir, 'AssemblyInfo')
-            if os.path.exists(assembly):
-                # It is a CS file
-                mk_assembly_info_version(assembly, major, minor, build, revision)
+            assembly_info_template = os.path.join(c.src_dir, c.assembly_info_dir, 'AssemblyInfo.cs.in')
+            assembly_info_output = assembly_info_template[:-3]
+            assert assembly_info_output.endswith('.cs')
+            if os.path.exists(assembly_info_template):
+                configure_file(assembly_info_template, assembly_info_output,
+                               { 'VER_MAJOR': str(major),
+                                 'VER_MINOR': str(minor),
+                                 'VER_BUILD': str(build),
+                                 'VER_REVISION': str(revision),
+                               }
+                              )
             else:
-                raise MKException("Failed to find assembly info file 'AssemblyInfo' at '%s'" % os.path.join(c.src_dir, c.assembly_info_dir))
-
-
-# Generate version number in the given 'AssemblyInfo.cs' file using 'AssemblyInfo' as a template.
-def mk_assembly_info_version(assemblyinfo, major, minor, build, revision):
-    ver_pat   = re.compile('[assembly: AssemblyVersion\("[\.\d]*"\) *')
-    fver_pat  = re.compile('[assembly: AssemblyFileVersion\("[\.\d]*"\) *')
-    fin  = open(assemblyinfo, 'r')
-    tmp  = '%s.cs' % assemblyinfo
-    fout = open(tmp, 'w')
-    num_updates = 0
-    for line in fin:
-        if ver_pat.match(line):
-            fout.write('[assembly: AssemblyVersion("%s.%s.%s.%s")]\n' % (major, minor, build, revision))
-            num_updates = num_updates + 1
-        elif fver_pat.match(line):
-            fout.write('[assembly: AssemblyFileVersion("%s.%s.%s.%s")]\n' % (major, minor, build, revision))
-            num_updates = num_updates + 1
-        else:
-            fout.write(line)
-    # if VERBOSE:
-    #    print("%s version numbers updated at '%s'" % (num_updates, assemblyinfo))
-    assert num_updates == 2, "unexpected number of version number updates"
-    fin.close()
-    fout.close()
-    if VERBOSE:
-        print("Updated '%s'" % assemblyinfo)
+                raise MKException("Failed to find assembly template info file '%s'" % assembly_info_template)
 
 ADD_TACTIC_DATA=[]
 ADD_PROBE_DATA=[]
@@ -3496,22 +3477,17 @@ class MakeRuleCmd(object):
 
     @classmethod
     def _install_root(cls, path, in_prefix, out, is_install=True):
-        if in_prefix:
-            assert not os.path.isabs(path)
-            install_root = cls.install_root()
-        else:
-            # This hack only exists for the Python bindings on OSX
-            # which are sometimes not installed inside the prefix.
-            # In all other cases installing outside the prefix is
-            # misleading and dangerous!
-            assert IS_OSX
-            assert os.path.isabs(path)
+        if not in_prefix:
+            # The Python bindings on OSX are sometimes not installed inside the prefix. 
             install_root = "$(DESTDIR)"
             action_string = 'install' if is_install else 'uninstall'
             cls.write_cmd(out, 'echo "WARNING: {}ing files/directories ({}) that are not in the install prefix ($(PREFIX))."'.format(
-                action_string, path))
-            print("WARNING: Generating makefile rule that {}s {} '{}' which is outside the installation prefix '{}'.".format(
-                action_string, 'to' if is_install else 'from', path, PREFIX))
+                    action_string, path))
+            #print("WARNING: Generating makefile rule that {}s {} '{}' which is outside the installation prefix '{}'.".format(
+            #        action_string, 'to' if is_install else 'from', path, PREFIX))
+        else:
+            assert not os.path.isabs(path)
+            install_root = cls.install_root()
         return install_root
 
     @classmethod
@@ -3631,14 +3607,15 @@ class MakeRuleCmd(object):
         out.write("\t@{}\n".format(line))
 
 def strip_path_prefix(path, prefix):
-    assert path.startswith(prefix)
-    stripped_path = path[len(prefix):]
-    stripped_path.replace('//','/')
-    if stripped_path[0] == '/':
-        stripped_path = stripped_path[1:]
-
-    assert not os.path.isabs(stripped_path)
-    return stripped_path
+    if path.startswith(prefix):
+        stripped_path = path[len(prefix):]
+        stripped_path.replace('//','/')
+        if stripped_path[0] == '/':
+            stripped_path = stripped_path[1:]
+        assert not os.path.isabs(stripped_path)
+        return stripped_path
+    else:
+        return path
 
 def configure_file(template_file_path, output_file_path, substitutions):
     """
