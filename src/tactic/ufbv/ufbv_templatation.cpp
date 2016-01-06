@@ -21,6 +21,7 @@ Notes:
 #include"ast_pp.h"
 #include"rewriter_def.h"
 #include"expr_replacer.h"
+#include"ref_util.h"
 
 #include"ufbv_templatation.h"
 
@@ -41,7 +42,7 @@ public:
         m_fd(fd, m),
         m_vars(m) {
         // Initial templates are just constants
-        m_terms.push_back(m.mk_fresh_const(0, fd->get_range()));
+        m_terms.push_back(m.mk_fresh_const("init_tmplt", fd->get_range()));
         m_degree = 0;
         for (unsigned i = 0; i < fd->get_arity(); i++)
             m_vars.push_back(m.mk_var(i, fd->get_domain()[i]));
@@ -69,10 +70,11 @@ public:
         expr_ref res(get_expr(), m);
 
         TRACE("ufbv_templatation",
-            tout << "Instantiating function call: " <<
-                "(= " << mk_ismt2_pp(call, m) << ")" <<
-                " w/ template (= " << call->get_decl()->get_name() << " " <<
-                mk_ismt2_pp(res, m) << ")" << std::endl;);
+            tout << "Instantiating function call: ";
+            if (call->get_decl()->get_arity() == 0) tout << "(";
+            tout << mk_ismt2_pp(call, m);
+            if (call->get_decl()->get_arity() == 0) tout << ")";
+            tout << " w/ template " << mk_ismt2_pp(res, m) << std::endl;);
 
         return res;
     }
@@ -89,6 +91,7 @@ public:
 
 
 ufbv_templatation::ufbv_templatation(ast_manager & m, params_ref const & p) :
+    simple_check_sat_result(m),
     m(m),
     m_params(p),
     m_bv_util(m),
@@ -102,18 +105,13 @@ ufbv_templatation::ufbv_templatation(ast_manager & m, params_ref const & p) :
 ufbv_templatation::~ufbv_templatation() {
     for (templates_t::iterator it = m_templates.begin();
          it != m_templates.end();
-         it++)
+         it++) {
+        m.dec_ref(it->m_key);
         dealloc(it->m_value);
+    }
 
-    for (calls_t::iterator it = m_calls.begin();
-         it != m_calls.end();
-         it++)
-        m.dec_ref(it->m_value);
-
-    for (obj_map<expr, expr*>::iterator it = m_core_labels.begin();
-         it != m_core_labels.end();
-         it++)
-        m.dec_ref(it->m_value);
+    dec_ref_map_key_values(m, m_calls);
+    dec_ref_map_key_values(m, m_core_labels);
 }
 
 void ufbv_templatation::add(expr * a) {
@@ -141,10 +139,11 @@ struct init_proc {
     void operator()(app * n) {
         func_decl * fd = n->get_decl();
         if (fd->get_family_id() == null_family_id && !m_templates.contains(fd)) {
-            TRACE("ufbv_templatation", tout << "Tracking " << mk_ismt2_pp(fd, m) << std::endl;);
+            TRACE("ufbv_templatation_detail", tout << "Tracking " << mk_ismt2_pp(fd, m) << std::endl;);
             ufbv_templatation::function_template * ft =
                 alloc(ufbv_templatation::function_template, m, fd);
             m_templates.insert(fd, ft);
+            m.inc_ref(fd);
         }
     }
 };
@@ -164,16 +163,19 @@ public:
         m(m), m_params(p), m_templates(t), m_calls(c) {}
 
     br_status reduce_app(func_decl * f, unsigned num, expr * const * args, expr_ref & result, proof_ref & result_pr) {
-        if (m_templates.contains(f)) {
+        if (f->get_family_id() == null_family_id &&
+            m_templates.contains(f)) {
             app_ref cll(m.mk_app(f, num, args), m);
+            TRACE("ufbv_templatation_detail", tout << "Call: " << mk_ismt2_pp(cll, m) << std::endl;);
             app * v = 0;
             if (m_calls.find(cll, v))
                 result = v;
             else {
-                result = m.mk_fresh_const(0, f->get_range());
-                app * r = to_app(result);
+                app * r = m.mk_fresh_const("fcall", f->get_range());
                 m_calls.insert(cll, r);
+                m.inc_ref(cll);
                 m.inc_ref(r);
+                result = r;
             }
             result_pr = 0;
             return BR_DONE;
@@ -230,13 +232,14 @@ void ufbv_templatation::instantiate_tmplts() {
         t_i = ft->instantiate(fc);
         expr_ref cc_eq_t_i(m.mk_eq(cc, t_i), m);
         expr_ref lbl(m), impl(m);
-        lbl = m.mk_fresh_const(0, m.mk_bool_sort());
+        lbl = m.mk_fresh_const("tmplt_inst", m.mk_bool_sort());
         impl = m.mk_implies(lbl, cc_eq_t_i);
         blast(impl);
 
         expr_ref actual_call(m);
         actual_call = m.mk_eq(cc, fc);
         m_core_labels.insert(lbl, actual_call);
+        m.inc_ref(lbl);
         m.inc_ref(actual_call);
         expr2var::var lbl_var = m_atom2bool.to_var(lbl);
         SASSERT(lbl_var != UINT_MAX);
@@ -251,8 +254,8 @@ void ufbv_templatation::display_trace() {
             tout << mk_ismt2_pp(m_goal.form(i), m) << std::endl;
         tout << "Calls:" << std::endl;
         for (calls_t::iterator it = m_calls.begin();
-        it != m_calls.end();
-            it++)
+             it != m_calls.end();
+             it++)
             tout << mk_ismt2_pp(it->m_key, m) << " := " << mk_ismt2_pp(it->m_value, m) << std::endl;
         tout << "Templates:" << std::endl;
         for (templates_t::iterator it = m_templates.begin();

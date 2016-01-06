@@ -29,7 +29,7 @@ Notes:
 #include"goal2sat.h"
 #include"th_rewriter.h"
 
-class ufbv_templatation : public check_sat_result {
+class ufbv_templatation : public simple_check_sat_result {
 public:
     class function_template;
 
