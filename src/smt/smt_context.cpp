@@ -4025,8 +4025,9 @@ namespace smt {
             return false;
         }
         case 1: {
-            if (m_qmanager->is_shared(n))
+            if (m_qmanager->is_shared(n)) {
                 return true;
+            }
             
             // the variabe is shared if the equivalence class of n 
             // contains a parent application.
