@@ -1284,7 +1284,7 @@ class fpa2bv_approx_tactic: public tactic {
 
             TRACE("sat_tactic", model_v2_pp(tout, *md););
             model_converter_ref bb_mc = mk_bit_blaster_model_converter(*m_temp_manager, bv2bool.const2bits());
-            model_converter_ref bv_mc = mk_fpa2bv_model_converter_prec(*m_temp_manager, fpa2bv.const2bv(), fpa2bv.rm_const2bv(), fpa2bv.uf2bvuf());
+            model_converter_ref bv_mc = mk_fpa2bv_model_converter_prec(*m_temp_manager, fpa2bv);
             bb_mc->operator()(md, 0);
             bv_mc->operator()(md, 0);
 

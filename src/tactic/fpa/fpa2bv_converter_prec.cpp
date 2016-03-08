@@ -388,9 +388,9 @@ void fpa2bv_converter_prec::mk_add(func_decl * f, unsigned prec, unsigned num, e
             m_simp.mk_ite(swap_cond, a_exp, b_exp, d_exp); // has ebits
 
             expr_ref res_sgn(m), res_sig(m), res_exp(m);
-            add_core(sbits, ebits, rm,
-                    c_sgn, c_sig, c_exp, d_sgn, d_sig, d_exp,
-                    res_sgn, res_sig, res_exp);
+            add_core(sbits, ebits,
+                     c_sgn, c_sig, c_exp, d_sgn, d_sig, d_exp,
+                     res_sgn, res_sig, res_exp);
 
             //Add the fixed zeroes here...?
             expr_ref sbits_zero(m), ebits_zero(m);

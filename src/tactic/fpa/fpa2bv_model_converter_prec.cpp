@@ -101,7 +101,7 @@ expr_ref fpa2bv_model_converter_prec::convert_bv2fp(sort * s, expr * sgn, expr *
     mpzm.set(sig_z, sig_q.to_mpq().numerator());
     exp_z = mpzm.get_int64(exp_unbiased_q.to_mpq().numerator());
 
-    fu.fm().set(fp_val, ebits, sbits, !mpqm.is_zero(sgn_q.to_mpq()), sig_z, exp_z);
+    fu.fm().set(fp_val, ebits, sbits, !mpqm.is_zero(sgn_q.to_mpq()), exp_z, sig_z);
 
     mpzm.del(sig_z);
 
@@ -318,9 +318,6 @@ void fpa2bv_model_converter_prec::convert(model * bv_mdl, model * float_mdl) {
     }
 }
 
-model_converter * mk_fpa2bv_model_converter_prec(ast_manager & m,
-                                            obj_map<func_decl, expr*> const & const2bv,
-                                            obj_map<func_decl, expr*> const & rm_const2bv,
-                                            obj_map<func_decl, func_decl*> const & uf2bvuf) {
-    return alloc(fpa2bv_model_converter_prec, m, const2bv, rm_const2bv, uf2bvuf);
+model_converter * mk_fpa2bv_model_converter_prec(ast_manager & m, fpa2bv_converter_prec const & conv) {    
+    return alloc(fpa2bv_model_converter_prec, m, conv);
 }
