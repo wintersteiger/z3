@@ -25,10 +25,15 @@ public class Z3Object extends IDisposable
 {
     /**
      * Finalizer.
+     * @throws Throwable 
      **/
-    protected void finalize()
+    protected void finalize() throws Throwable
     {
-        dispose();
+        try {
+            dispose();            
+        } finally {
+            super.finalize();
+        }
     }
 
     /**
@@ -43,8 +48,9 @@ public class Z3Object extends IDisposable
         }
 
         if (m_ctx != null)
-        {
-            m_ctx.m_refCount--;
+        {            
+            if (m_ctx.m_refCount.decrementAndGet() == 0)
+                m_ctx.dispose();
             m_ctx = null;
         }
     }
@@ -54,13 +60,13 @@ public class Z3Object extends IDisposable
 
     Z3Object(Context ctx)
     {
-        ctx.m_refCount++;
+        ctx.m_refCount.incrementAndGet();
         m_ctx = ctx;
     }
 
     Z3Object(Context ctx, long obj)
     {
-        ctx.m_refCount++;
+        ctx.m_refCount.incrementAndGet();
         m_ctx = ctx;
         incRef(obj);
         m_n_obj = obj;

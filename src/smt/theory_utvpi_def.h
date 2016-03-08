@@ -223,7 +223,7 @@ namespace smt {
               );
         
         if (m_params.m_arith_dump_lemmas) {
-            char const * logic = m_lra ? (m_lia?"QF_LIRA":"QF_LRA") : "QF_LIA";
+            symbol logic(m_lra ? (m_lia?"QF_LIRA":"QF_LRA") : "QF_LIA");
             ctx.display_lemma_as_smt_problem(lits.size(), lits.c_ptr(), false_literal, logic);
         }
         
@@ -942,6 +942,10 @@ namespace smt {
         }
     }
 
+    template<typename Ext>
+    theory* theory_utvpi<Ext>::mk_fresh(context* new_ctx) { 
+        return alloc(theory_utvpi<Ext>, new_ctx->get_manager()); 
+    }
 
 
 };

@@ -22,32 +22,24 @@ import com.microsoft.z3.enumerations.Z3_ast_kind;
 /**
  * The abstract syntax tree (AST) class.
  **/
-public class AST extends Z3Object implements Comparable
+public class AST extends Z3Object implements Comparable<AST>
 {
     /**
      * Object comparison.
      * 
      * @param o another AST
-     **/    
+     **/
+    @Override
     public boolean equals(Object o)
     {
-        AST casted = null;
+        if (o == this) return true;
+        if (!(o instanceof AST)) return false;
+        AST casted = (AST) o;
 
-	try
-        {
-            casted = AST.class.cast(o);
-        } catch (ClassCastException e)
-        {
-            return false;
-        }
-
-	return  
-	    (this == casted) || 
-	    (this != null) &&
-	    (casted != null) &&
-	    (getContext().nCtx() == casted.getContext().nCtx()) &&
-	    (Native.isEqAst(getContext().nCtx(), getNativeObject(), casted.getNativeObject()));
-}
+        return
+            (getContext().nCtx() == casted.getContext().nCtx()) &&
+                (Native.isEqAst(getContext().nCtx(), getNativeObject(), casted.getNativeObject()));
+    }
 
     /**
      * Object Comparison. 
@@ -57,26 +49,13 @@ public class AST extends Z3Object implements Comparable
      * positive if after else zero.
      * @throws Z3Exception on error
      **/
-    public int compareTo(Object other)
+    @Override
+    public int compareTo(AST other)
     {
-        if (other == null)
-            return 1;
-
-        AST oAST = null;
-        try
-        {
-            oAST = AST.class.cast(other);
-        } catch (ClassCastException e)
-        {
+        if (other == null) {
             return 1;
         }
-
-        if (getId() < oAST.getId())
-            return -1;
-        else if (getId() > oAST.getId())
-            return +1;
-        else
-            return 0;
+        return Integer.compare(getId(), other.getId());
     }
 
     /**
@@ -84,14 +63,10 @@ public class AST extends Z3Object implements Comparable
      * 
      * @return A hash code
      **/
+    @Override
     public int hashCode()
     {
-        int r = 0;
-        try {
-            Native.getAstHash(getContext().nCtx(), getNativeObject());
-        }
-        catch (Z3Exception ex) {}
-        return r;
+        return Native.getAstHash(getContext().nCtx(), getNativeObject());
     }
 
     /**
@@ -113,11 +88,12 @@ public class AST extends Z3Object implements Comparable
     public AST translate(Context ctx)
     {
 
-        if (getContext() == ctx)
+        if (getContext() == ctx) {
             return this;
-        else
+        } else {
             return new AST(ctx, Native.translate(getContext().nCtx(),
-                    getNativeObject(), ctx.nCtx()));
+                getNativeObject(), ctx.nCtx()));
+        }
     }
 
     /**
@@ -198,6 +174,7 @@ public class AST extends Z3Object implements Comparable
     /**
      * A string representation of the AST.
      **/
+    @Override
     public String toString()
     {
         try
@@ -227,6 +204,7 @@ public class AST extends Z3Object implements Comparable
         super(ctx, obj);
     }
 
+    @Override
     void incRef(long o)
     {
         // Console.WriteLine("AST IncRef()");
@@ -236,6 +214,7 @@ public class AST extends Z3Object implements Comparable
         super.incRef(o);
     }
 
+    @Override
     void decRef(long o)
     {
         // Console.WriteLine("AST DecRef()");

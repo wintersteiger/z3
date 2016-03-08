@@ -26,9 +26,8 @@ Notes:
 #include"probe_arith.h"
 #include"qfnra_tactic.h"
 
-
 #include"qffp_tactic.h"
-#include"fpa2bv_approx_tactic.h"
+
 
 struct has_fp_to_real_predicate {
     struct found {};
@@ -69,41 +68,24 @@ tactic * mk_qffp_tactic(ast_manager & m, params_ref const & p) {
     params_ref simp_p = p;
     simp_p.set_bool("arith_lhs", true);
     simp_p.set_bool("elim_and", true);
-
-
-
+    
     tactic * st = and_then(mk_simplify_tactic(m, simp_p),
-               mk_propagate_values_tactic(m, p),
-               using_params(mk_simplify_tactic(m, p), simp_p),
-                           cond(mk_or(mk_produce_proofs_probe(), mk_produce_unsat_cores_probe()),
-                                mk_smt_tactic(),
-                cond(mk_has_fp_to_real_probe(),
-                     mk_qfnra_tactic(m, p),
-                     mk_fpa2bv_approx_tactic(m, p))),
-                 mk_fail_if_undecided_tactic());
-
-    st->updt_params(p);
-    return st;
-//    tactic * st = and_then(mk_simplify_tactic(m, simp_p),
-//                           mk_propagate_values_tactic(m, p),
-//                           cond(mk_or(mk_produce_proofs_probe(), mk_produce_unsat_cores_probe()),
-//                                mk_smt_tactic(),
-//                                and_then(
-//                                     mk_fpa2bv_tactic(m, p),
-//                                     mk_propagate_values_tactic(m, p),
-//                                     using_params(mk_simplify_tactic(m, p), simp_p),
-//                                     mk_bit_blaster_tactic(m, p),
-//                                     using_params(mk_simplify_tactic(m, p), simp_p),
-//                                     cond(mk_is_propositional_probe(),
-//                                        mk_sat_tactic(m, p),
-//                                        cond(mk_has_fp_to_real_probe(),
-//                                            mk_qfnra_tactic(m, p),
-//                                            mk_smt_tactic(p))
-//                                        ),
-//                                     mk_fail_if_undecided_tactic());//));
-//
-//    st->updt_params(p);
-//    return st;
+                           mk_propagate_values_tactic(m, p),
+                           mk_fpa2bv_tactic(m, p),
+                           mk_propagate_values_tactic(m, p),
+                           using_params(mk_simplify_tactic(m, p), simp_p),
+                           mk_bit_blaster_tactic(m, p),
+                           using_params(mk_simplify_tactic(m, p), simp_p),
+                           cond(mk_is_propositional_probe(),
+                                cond(mk_produce_proofs_probe(),
+                                     mk_smt_tactic(), // `sat' does not support proofs.
+                                     mk_sat_tactic(m, p)),
+                                cond(mk_has_fp_to_real_probe(),
+                                     mk_qfnra_tactic(m, p),
+                                     mk_smt_tactic(p))),
+                            mk_fail_if_undecided_tactic());
+   st->updt_params(p);
+   return st;
 }
 
 tactic * mk_qffpbv_tactic(ast_manager & m, params_ref const & p) {

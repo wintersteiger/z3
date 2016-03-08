@@ -73,9 +73,11 @@ public:
         unsigned cache_sz;
         unsigned num_steps = 0;
         unsigned timeout   = m_params.get_uint("timeout", UINT_MAX);
+        unsigned rlimit    = m_params.get_uint("rlimit", UINT_MAX);
         bool failed = false;
-        cancel_eh<th_rewriter> eh(s);
+        cancel_eh<reslimit> eh(ctx.m().limit());
         { 
+            scoped_rlimit _rlimit(ctx.m().limit(), rlimit);
             scoped_ctrl_c ctrlc(eh);
             scoped_timer timer(timeout, &eh);
             cmd_context::scoped_watch sw(ctx);
@@ -100,7 +102,7 @@ public:
         }
         if (!failed && m_params.get_bool("print_proofs", false)) {
             ast_smt_pp pp(ctx.m());
-            pp.set_logic(ctx.get_logic().str().c_str());
+            pp.set_logic(ctx.get_logic());
             pp.display_expr_smt2(ctx.regular_stream(), pr.get());
             ctx.regular_stream() << std::endl;
         }

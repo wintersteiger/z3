@@ -71,6 +71,7 @@ namespace smt {
 
         std::ostream& display_last_failure(std::ostream& out) const;
         std::string last_failure_as_string() const;
+        void set_reason_unknown(char const* msg) { m_unknown = msg; }
         void set_progress_callback(progress_callback *callback);
 
 
@@ -79,7 +80,6 @@ namespace smt {
         smt_params &                m_fparams;
         params_ref                  m_params;
         setup                       m_setup;
-        volatile bool               m_cancel_flag;
         timer                       m_timer;
         asserted_formulas           m_asserted_formulas;
         scoped_ptr<quantifier_manager>   m_qmanager;
@@ -198,6 +198,7 @@ namespace smt {
         // -----------------------------------
         proto_model_ref            m_proto_model;
         model_ref                  m_model;
+        std::string                m_unknown;
         void                       mk_proto_model(lbool r);
         struct scoped_mk_model;
 
@@ -233,9 +234,8 @@ namespace smt {
             return m_params;
         }
 
-        virtual void set_cancel_flag(bool f = true);
 
-        bool get_cancel_flag() { return m_cancel_flag || !m_manager.limit().inc(); }
+        bool get_cancel_flag() { return !m_manager.limit().inc(); }
 
         region & get_region() {
             return m_region;
@@ -1176,7 +1176,17 @@ namespace smt {
 
         void display_literals(std::ostream & out, unsigned num_lits, literal const * lits) const;
 
+        void display_literals(std::ostream & out, literal_vector const& lits) const {
+            display_literals(out, lits.size(), lits.c_ptr());
+        }
+
+        void display_literal_verbose(std::ostream & out, literal lit) const;
+
         void display_literals_verbose(std::ostream & out, unsigned num_lits, literal const * lits) const;
+
+        void display_literals_verbose(std::ostream & out, literal_vector const& lits) const {
+            display_literals_verbose(out, lits.size(), lits.c_ptr());
+        }
 
         void display_watch_list(std::ostream & out, literal l) const;
 
@@ -1208,18 +1218,18 @@ namespace smt {
 
         void display_hot_bool_vars(std::ostream & out) const;
 
-        void display_lemma_as_smt_problem(std::ostream & out, unsigned num_antecedents, literal const * antecedents, literal consequent = false_literal, const char * logic = "AUFLIRA") const;
+        void display_lemma_as_smt_problem(std::ostream & out, unsigned num_antecedents, literal const * antecedents, literal consequent = false_literal, symbol const& logic = symbol::null) const;
 
-        void display_lemma_as_smt_problem(unsigned num_antecedents, literal const * antecedents, literal consequent = false_literal, const char * logic = "AUFLIRA") const;
+        void display_lemma_as_smt_problem(unsigned num_antecedents, literal const * antecedents, literal consequent = false_literal, symbol const& logic = symbol::null) const;
         void display_lemma_as_smt_problem(std::ostream & out, unsigned num_antecedents, literal const * antecedents, 
                                           unsigned num_antecedent_eqs, enode_pair const * antecedent_eqs, 
-                                          literal consequent = false_literal, const char * logic = "AUFLIRA") const;
+                                          literal consequent = false_literal, symbol const& logic = symbol::null) const;
 
         void display_lemma_as_smt_problem(unsigned num_antecedents, literal const * antecedents, 
                                           unsigned num_antecedent_eqs, enode_pair const * antecedent_eqs, 
-                                          literal consequent = false_literal, const char * logic = "AUFLIRA") const;
+                                          literal consequent = false_literal, symbol const& logic = symbol::null) const;
 
-        void display_assignment_as_smtlib2(std::ostream& out, const char * logic = "AUFLIRA") const; 
+        void display_assignment_as_smtlib2(std::ostream& out, symbol const& logic = symbol::null) const; 
 
         void display_normalized_enodes(std::ostream & out) const;
 
@@ -1236,6 +1246,8 @@ namespace smt {
         void display_profile_res_sub(std::ostream & out) const;
 
         void display_profile(std::ostream & out) const;
+
+        void display(std::ostream& out, b_justification j) const;
 
         // -----------------------------------
         //
@@ -1324,8 +1336,17 @@ namespace smt {
         // -----------------------------------
         void assert_expr_core(expr * e, proof * pr);
 
+        // copy plugins into a fresh context.
+        void copy_plugins(context& src, context& dst);
+
+        static literal translate_literal(
+            literal lit, context& src_ctx, context& dst_ctx,
+            vector<bool_var> b2v, ast_translation& tr);
+
+
     public:
         context(ast_manager & m, smt_params & fp, params_ref const & p = params_ref());
+
 
         virtual ~context();
 
@@ -1338,9 +1359,15 @@ namespace smt {
         */
         context * mk_fresh(symbol const * l = 0,  smt_params * p = 0);
 
+        static void copy(context& src, context& dst);
+
+        /**
+           \brief Translate context to use new manager m.
+         */
+
         app * mk_eq_atom(expr * lhs, expr * rhs);
 
-        bool set_logic(symbol logic) { return m_setup.set_logic(logic); }
+        bool set_logic(symbol const& logic) { return m_setup.set_logic(logic); }
 
         void register_plugin(simplifier_plugin * s);
 
@@ -1400,6 +1427,8 @@ namespace smt {
         bool update_model(bool refinalize);
 
         void get_proto_model(proto_model_ref & m) const;
+
+        bool validate_model();
         
         unsigned get_num_asserted_formulas() const { return m_asserted_formulas.get_num_formulas(); }
 

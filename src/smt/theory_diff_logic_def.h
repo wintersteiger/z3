@@ -632,7 +632,7 @@ void theory_diff_logic<Ext>::new_edge(dl_var src, dl_var dst, unsigned num_edges
     }
     ctx.mk_clause(lits.size(), lits.c_ptr(), js, CLS_AUX_LEMMA, 0);
     if (dump_lemmas()) {
-        char const * logic = m_is_lia ? "QF_LIA" : "QF_LRA";
+        symbol logic(m_is_lia ? "QF_LIA" : "QF_LRA");
         ctx.display_lemma_as_smt_problem(lits.size(), lits.c_ptr(), false_literal, logic);
     }
 
@@ -678,7 +678,7 @@ void theory_diff_logic<Ext>::set_neg_cycle_conflict() {
           );
 
     if (dump_lemmas()) {
-        char const * logic = m_is_lia ? "QF_LIA" : "QF_LRA";
+        symbol logic(m_is_lia ? "QF_LIA" : "QF_LRA");
         ctx.display_lemma_as_smt_problem(lits.size(), lits.c_ptr(), false_literal, logic);
     }
 
@@ -1383,6 +1383,12 @@ bool theory_diff_logic<Ext>::internalize_objective(expr * n, rational const& m, 
     }
     return true;
 }
+
+template<typename Ext>
+theory* theory_diff_logic<Ext>::mk_fresh(context* new_ctx) {
+    return alloc(theory_diff_logic<Ext>, new_ctx->get_manager(), m_params); 
+}
+
 
 #endif /* THEORY_DIFF_LOGIC_DEF_H_ */
 

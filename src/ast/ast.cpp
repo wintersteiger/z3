@@ -516,7 +516,7 @@ inline unsigned ast_array_hash(T * const * array, unsigned size, unsigned init_v
         switch (size) {
         case 2:
             b += array[1]->hash();
-            __fallthrough;
+            Z3_fallthrough;
         case 1:
             c += array[0]->hash();
         }
@@ -1308,7 +1308,8 @@ ast_manager::ast_manager(proof_gen_mode m, char const * trace_file, bool is_form
     m_expr_dependency_array_manager(*this, m_alloc),
     m_proof_mode(m),
     m_trace_stream(0),
-    m_trace_stream_owner(false) {
+    m_trace_stream_owner(false),
+    m_rec_fun(":rec-fun") {
 
     if (trace_file) {
         m_trace_stream       = alloc(std::fstream, trace_file, std::ios_base::out);
@@ -1329,7 +1330,8 @@ ast_manager::ast_manager(proof_gen_mode m, std::fstream * trace_stream, bool is_
     m_expr_dependency_array_manager(*this, m_alloc),
     m_proof_mode(m),
     m_trace_stream(trace_stream),
-    m_trace_stream_owner(false) {
+    m_trace_stream_owner(false),
+    m_rec_fun(":rec-fun") {
 
     if (!is_format_manager)
         m_format_manager = alloc(ast_manager, PGM_DISABLED, trace_stream, true);
@@ -1345,7 +1347,8 @@ ast_manager::ast_manager(ast_manager const & src, bool disable_proofs):
     m_expr_dependency_array_manager(*this, m_alloc),
     m_proof_mode(disable_proofs ? PGM_DISABLED : src.m_proof_mode),
     m_trace_stream(src.m_trace_stream),
-    m_trace_stream_owner(false) {
+    m_trace_stream_owner(false),
+    m_rec_fun(":rec-fun") {
     SASSERT(!src.is_format_manager());
     m_format_manager = alloc(ast_manager, PGM_DISABLED, m_trace_stream, true);
     init();
@@ -1430,12 +1433,6 @@ ast_manager::~ast_manager() {
         tmp.close();
         dealloc(m_trace_stream);
         m_trace_stream = 0;
-    }
-}
-
-void ast_manager::set_cancel(bool f) {
-    for (unsigned i = 0; i < m_plugins.size(); i++) {
-        m_plugins[i]->set_cancel(f);
     }
 }
 
@@ -1662,6 +1659,7 @@ ast * ast_manager::register_node_core(ast * n) {
 
     n->m_id   = is_decl(n) ? m_decl_id_gen.mk() : m_expr_id_gen.mk();
 
+    
     TRACE("ast", tout << "Object " << n->m_id << " was created.\n";);
     TRACE("mk_var_bug", tout << "mk_ast: " << n->m_id << "\n";);
     // increment reference counters
@@ -2097,6 +2095,7 @@ inline app * ast_manager::mk_app_core(func_decl * decl, expr * arg1, expr * arg2
 }
 
 app * ast_manager::mk_app(func_decl * decl, unsigned num_args, expr * const * args) {
+
     bool type_error = 
         decl->get_arity() != num_args && !decl->is_right_associative() && 
         !decl->is_left_associative() && !decl->is_chainable();
@@ -2871,22 +2870,24 @@ proof * ast_manager::mk_unit_resolution(unsigned num_proofs, proof * const * pro
         svector<bool> found;
 #endif
         for (unsigned i = 0; i < num_args; i++) {
+            bool found_complement = false;
             expr * lit = cls->get_arg(i);
-            unsigned j = 1;
-            for (; j < num_proofs; j++) {
+            for (unsigned j = 1; j < num_proofs; j++) {
                 expr const * _fact = get_fact(proofs[j]);
                 if (is_complement(lit, _fact)) {
-                    DEBUG_CODE(found.setx(j, true, false););
+                    found_complement = true;
+                    DEBUG_CODE(found.setx(j, true, false); continue;);                    
                     break;
                 }
             }
-            if (j == num_proofs)
+            if (!found_complement)
                 new_lits.push_back(lit);
         }
         DEBUG_CODE({
             for (unsigned i = 1; m_proof_mode == PGM_FINE && i < num_proofs; i++) {
                 CTRACE("mk_unit_resolution_bug", !found.get(i, false), 
                        for (unsigned j = 0; j < num_proofs; j++) {
+                           if (j == i) tout << "Index " << i << " was not found:\n";                       
                            tout << mk_ll_pp(get_fact(proofs[j]), *this);
                        });
                 SASSERT(found.get(i, false));

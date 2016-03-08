@@ -24,11 +24,16 @@ public class ConstructorList extends Z3Object
 {
     /**
      * Destructor.
+     * @throws Throwable 
      * @throws Z3Exception on error
      **/
-    protected void finalize()
+    protected void finalize() throws Throwable
     {
-        Native.delConstructorList(getContext().nCtx(), getNativeObject());
+        try {        
+            Native.delConstructorList(getContext().nCtx(), getNativeObject());            
+        } finally {
+            super.finalize();
+        }
     }
 
     ConstructorList(Context ctx, long obj)
@@ -41,7 +46,7 @@ public class ConstructorList extends Z3Object
         super(ctx);
 
         setNativeObject(Native.mkConstructorList(getContext().nCtx(),
-                (int) constructors.length,
+                constructors.length,
                 Constructor.arrayToNative(constructors)));
     }
 }

@@ -44,7 +44,8 @@ namespace opt {
         m_fm(fm),
         m_objective_terms(m),
         m_dump_benchmarks(false),
-        m_first(true) {
+        m_first(true),
+        m_was_unknown(false) {
         m_params.updt_params(p);
         if (m_params.m_case_split_strategy == CS_ACTIVITY_DELAY_NEW) {
             m_params.m_relevancy_lvl = 0;
@@ -61,6 +62,11 @@ namespace opt {
         m_dump_benchmarks = p.dump_benchmarks();
         m_params.updt_params(_p);
         m_context.updt_params(_p);
+    }
+
+    solver* opt_solver::translate(ast_manager& m, params_ref const& p) {
+        UNREACHABLE();
+        return 0;
     }
 
     void opt_solver::collect_param_descrs(param_descrs & r) {
@@ -156,7 +162,7 @@ namespace opt {
             std::stringstream file_name;
             file_name << "opt_solver" << ++m_dump_count << ".smt2";
             std::ofstream buffer(file_name.str().c_str());
-            to_smt2_benchmark(buffer, num_assumptions, assumptions, "opt_solver", "");
+            to_smt2_benchmark(buffer, num_assumptions, assumptions, "opt_solver");
             buffer.close();
             IF_VERBOSE(1, verbose_stream() << "(created benchmark: " << file_name.str() << "...";
                        verbose_stream().flush(););
@@ -168,6 +174,7 @@ namespace opt {
         else {
             r = m_context.check(num_assumptions, assumptions);
         }
+        r = adjust_result(r);
         m_first = false;
         if (dump_benchmarks()) {
             w.stop();
@@ -237,6 +244,7 @@ namespace opt {
         TRACE("opt", tout << ge << "\n";);
         assert_expr(ge);
         lbool is_sat = m_context.check(0, 0);
+        is_sat = adjust_result(is_sat);
         if (is_sat == l_true) {
             set_model(i);
         }
@@ -256,6 +264,13 @@ namespace opt {
 
     }
 
+    lbool opt_solver::adjust_result(lbool r) {
+        if (r == l_undef && m_context.last_failure() == smt::QUANTIFIERS) {
+            r = l_true;
+            m_was_unknown = true;
+        }
+        return r;
+    }
     
     void opt_solver::get_unsat_core(ptr_vector<expr> & r) {
         unsigned sz = m_context.get_unsat_core_size();
@@ -275,17 +290,18 @@ namespace opt {
     std::string opt_solver::reason_unknown() const {
         return m_context.last_failure_as_string();
     }
+
+    void opt_solver::set_reason_unknown(char const* msg) {
+        m_context.set_reason_unknown(msg);
+    }
     
     void opt_solver::get_labels(svector<symbol> & r) {
+        r.reset();
         buffer<symbol> tmp;
         m_context.get_relevant_labels(0, tmp);
         r.append(tmp.size(), tmp.c_ptr());
     }
-    
-    void opt_solver::set_cancel(bool f) {
-        m_context.set_cancel(f);
-    }
-    
+        
     void opt_solver::set_progress_callback(progress_callback * callback) {
         m_callback = callback;
         m_context.set_progress_callback(callback);
@@ -384,7 +400,7 @@ namespace opt {
         unsigned num_assumptions, 
         expr * const * assumptions,
         char const * name, 
-        char const * logic, 
+        symbol const& logic,
         char const * status, 
         char const * attributes) {        
         ast_smt_pp pp(m);

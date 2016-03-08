@@ -118,7 +118,7 @@ namespace opt {
             expr_ref_vector asms(m);
             init();
             init_bcd();
-            if (m_cancel) {
+            if (m.canceled()) {
                 normalize_bounds();
                 return l_undef;
             }
@@ -130,7 +130,7 @@ namespace opt {
                 TRACE("opt", display(tout););
                 assert_cores();
                 set2asms(m_asm_set, asms);                
-                if (m_cancel) {
+                if (m.canceled()) {
                     normalize_bounds();
                     return l_undef;
                 }
@@ -233,8 +233,7 @@ namespace opt {
             new_assignment.reset();
             s().get_model(model);
             for (unsigned i = 0; i < m_soft.size(); ++i) {
-                VERIFY(model->eval(m_soft[i], val));    
-                new_assignment.push_back(m.is_true(val));                            
+                new_assignment.push_back(model->eval(m_soft[i], val) && m.is_true(val));
                 if (!new_assignment[i]) {
                     new_upper += m_weights[i];
                 }
