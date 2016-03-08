@@ -186,6 +186,35 @@ void fpa2bv_model_converter_prec::convert(model * bv_mdl, model * float_mdl) {
 
     obj_hashtable<func_decl> seen;
 
+    for (obj_map<func_decl, std::pair<app*, app*> >::iterator it = m_specials.begin();
+         it != m_specials.end();
+         it++) {
+        func_decl * f = it->m_key;
+        expr_ref pzero(m), nzero(m);
+        pzero = fu.mk_pzero(f->get_range());
+        nzero = fu.mk_nzero(f->get_range());
+
+        expr_ref pn(m), np(m);
+        bv_mdl->eval(it->m_value.first, pn, true);
+        bv_mdl->eval(it->m_value.second, np, true);
+        seen.insert(it->m_value.first->get_decl());
+        seen.insert(it->m_value.second->get_decl());
+
+        rational pn_num, np_num;
+        unsigned bv_sz;
+        bu.is_numeral(pn, pn_num, bv_sz);
+        bu.is_numeral(np, np_num, bv_sz);
+
+        func_interp * flt_fi = alloc(func_interp, m, f->get_arity());
+        expr * pn_args[2] = { pzero, nzero };
+        if (pn != np) flt_fi->insert_new_entry(pn_args, (pn_num.is_one() ? nzero : pzero));
+        flt_fi->set_else(np_num.is_one() ? nzero : pzero);
+
+        float_mdl->register_decl(f, flt_fi);
+        TRACE("fpa2bv_mc", tout << "fp.min/fp.max special: " << std::endl <<
+                            mk_ismt2_pp(f, m) << " == " << mk_ismt2_pp(flt_fi->get_interp(), m) << std::endl;);
+    }
+
     for (obj_map<func_decl, expr*>::iterator it = m_const2bv.begin();
          it != m_const2bv.end();
          it++) {
