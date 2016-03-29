@@ -878,20 +878,24 @@ extern "C" {
         LOG_Z3_benchmark_to_smtlib_string(c, name, logic, status, attributes, num_assumptions, assumptions, formula);
         RESET_ERROR_CODE();
         std::ostringstream buffer;
-        ast_smt_pp pp(mk_c(c)->m());
-        pp.set_benchmark_name(name);
-        pp.set_logic(logic?symbol(logic):symbol::null);
-        pp.set_status(status);
-        pp.add_attributes(attributes);
-        pp_params params;
-        pp.set_simplify_implies(params.simplify_implies());
-        for (unsigned i = 0; i < num_assumptions; ++i) {
-            pp.add_assumption(to_expr(assumptions[i]));
-        }
         if (mk_c(c)->get_print_mode() == Z3_PRINT_SMTLIB2_COMPLIANT) {
-            pp.display_smt2(buffer, to_expr(formula));
+            display_smt2_benchmark(buffer,
+                name, "", status, "", logic, attributes,
+                mk_c(c)->m(),
+                num_assumptions, to_exprs(assumptions),
+                1, to_exprs(&formula));
         }
         else {
+            ast_smt_pp pp(mk_c(c)->m());
+            pp.set_benchmark_name(name);
+            pp.set_logic(logic ? symbol(logic) : symbol::null);
+            pp.set_status(status);
+            pp.add_attributes(attributes);
+            pp_params params;
+            pp.set_simplify_implies(params.simplify_implies());
+            for (unsigned i = 0; i < num_assumptions; ++i) {
+                pp.add_assumption(to_expr(assumptions[i]));
+            }
             pp.display(buffer, to_expr(formula));
         }
         return mk_c(c)->mk_external_string(buffer.str());

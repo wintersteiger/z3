@@ -24,6 +24,7 @@ Revision History:
 #include"ast_ll_pp.h"
 #include"ast_pp.h"
 #include"algebraic_numbers.h"
+#include"decl_collector.h"
 #include"pp_params.hpp"
 using namespace format_ns;
 
@@ -1244,3 +1245,68 @@ void pp(expr_ref const & n) {
     std::cout << mk_ismt2_pp(n.get(), n.m()) << std::endl;
 }
 #endif
+
+void display_smt2_benchmark(std::ostream& strm,
+    char const * name,
+    char const * source_info,
+    char const * status,
+    char const * category,
+    char const * logic,
+    char const * attributes,
+    ast_manager & m,
+    unsigned num_assumptions, expr * const * assumptions,
+    unsigned num_assertions, expr * const * assertions) {
+    smt2_pp_environment_dbg pp_env(m);
+
+    ptr_vector<quantifier> ql;
+    decl_collector decls(m);
+
+    if (name != 0 && strcmp(name, "") != 0) {
+        strm << "; " << name << "\n";
+    }
+    strm << "(set-info :smt-lib-version 2.0)\n";
+    if (logic != 0 && strcmp(logic, "") != 0) {
+        strm << "(set-logic " << logic << ")\n";
+    }
+    if (source_info != 0 && strcmp(source_info, "") != 0) {
+        strm << "(set-info :source { " << source_info << " })\n";
+    }
+    if (status != 0 && strcmp(status, "") != 0) {
+        strm << "(set-info :status " << status << ")\n";
+    }
+    if (category != 0 && strcmp(category, "") != 0) {
+        strm << "(set-info :category \"" << category << "\")\n";
+    }
+    if (attributes != 0 && strcmp(attributes, "") != 0) {
+        strm << "; Attributes: " << attributes;
+    }
+
+    ast_mark sort_mark;
+    for (unsigned i = 0; i < decls.get_num_sorts(); ++i) {
+        sort * s = decls.get_sorts()[i];
+        ast_smt2_pp(strm, s, pp_env);
+    }
+
+    for (unsigned i = 0; i < decls.get_num_decls(); ++i) {
+        func_decl * d = decls.get_func_decls()[i];
+        ast_smt2_pp(strm, d, pp_env);
+    }
+
+    for (unsigned i = 0; i < num_assumptions; ++i) {
+        expr * a_i = assumptions[i];
+        decls.visit(a_i);
+        strm << "(assert ";
+        ast_smt2_pp(strm, a_i, pp_env);
+        strm << ")\n";
+    }
+
+    for (unsigned i = 0; i < num_assertions; ++i) {
+        expr * a_i = assertions[i];
+        decls.visit(a_i);
+        strm << "(assert ";
+        ast_smt2_pp(strm, a_i, pp_env);
+        strm << ")\n";
+    }
+
+    strm << "(check-sat)\n(exit)\n";
+}

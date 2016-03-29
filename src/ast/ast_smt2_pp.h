@@ -50,7 +50,7 @@ public:
     virtual fpa_util & get_futil() = 0;
     virtual seq_util & get_sutil() = 0;
     virtual datalog::dl_decl_util& get_dlutil() = 0;
-    virtual bool uses(symbol const & s) const = 0; 
+    virtual bool uses(symbol const & s) const = 0;
     virtual format_ns::format * pp_fdecl(func_decl * f, unsigned & len);
     virtual format_ns::format * pp_bv_literal(app * t, bool use_bv_lits, bool bv_neg);
     virtual format_ns::format * pp_arith_literal(app * t, bool decimal, unsigned prec);
@@ -87,13 +87,13 @@ public:
     virtual bool uses(symbol const & s) const { return false; }
 };
 
-void mk_smt2_format(expr * n, smt2_pp_environment & env, params_ref const & p, 
+void mk_smt2_format(expr * n, smt2_pp_environment & env, params_ref const & p,
                     unsigned num_vars, char const * var_prefix,
                     format_ns::format_ref & r, sbuffer<symbol> & var_names);
 void mk_smt2_format(sort * s, smt2_pp_environment & env, params_ref const & p, format_ns::format_ref & r);
 void mk_smt2_format(func_decl * f, smt2_pp_environment & env, params_ref const & p, format_ns::format_ref & r);
 
-std::ostream & ast_smt2_pp(std::ostream & out, expr * n, smt2_pp_environment & env, params_ref const & p = params_ref(), unsigned indent = 0, 
+std::ostream & ast_smt2_pp(std::ostream & out, expr * n, smt2_pp_environment & env, params_ref const & p = params_ref(), unsigned indent = 0,
                            unsigned num_vars = 0, char const * var_prefix = 0);
 std::ostream & ast_smt2_pp(std::ostream & out, sort * s, smt2_pp_environment & env, params_ref const & p = params_ref(), unsigned indent = 0);
 std::ostream & ast_smt2_pp(std::ostream & out, func_decl * f, smt2_pp_environment & env, params_ref const & p = params_ref(), unsigned indent = 0);
@@ -125,5 +125,16 @@ std::ostream& operator<<(std::ostream& out, expr_ref_vector const& e);
 std::ostream& operator<<(std::ostream& out, app_ref_vector const& e);
 std::ostream& operator<<(std::ostream& out, func_decl_ref_vector const& e);
 std::ostream& operator<<(std::ostream& out, sort_ref_vector const& e);
+
+void display_smt2_benchmark(std::ostream & strm,
+    char const * name,
+    char const * source_info,
+    char const * status,
+    char const * category,
+    char const * logic,
+    char const * attributes,
+    ast_manager & m,
+    unsigned num_assumptions, expr * const * assumptions,
+    unsigned num_assertions, expr * const * assertions);
 
 #endif
