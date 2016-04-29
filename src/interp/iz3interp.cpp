@@ -50,7 +50,7 @@ using namespace stl_ext;
 #if 1
 
 struct frame_reducer : public iz3mgr {
-  
+
     int frames;
     hash_map<ast,int> frame_map;
     std::vector<int> assertions_map;
@@ -80,8 +80,8 @@ struct frame_reducer : public iz3mgr {
             }
         }
     }
-  
-    void get_frames(const std::vector<std::vector<ast> >&z3_preds, 
+
+    void get_frames(const std::vector<std::vector<ast> >&z3_preds,
                     const std::vector<int> &orig_parents,
                     std::vector<std::vector<ast> >&assertions,
                     std::vector<int> &parents,
@@ -97,7 +97,7 @@ struct frame_reducer : public iz3mgr {
         std::vector<int> assertions_back_map(frames);
 
         // if multiple children of a tree node are used, we can't delete it
-        std::vector<int> used_children; 
+        std::vector<int> used_children;
         for(int i = 0; i < frames; i++)
             used_children.push_back(0);
         for(int i = 0; i < frames; i++)
@@ -114,7 +114,7 @@ struct frame_reducer : public iz3mgr {
                 assertions_map.push_back(i);
                 assertions_back_map[i] = assertions.size() - 1;
             }
-    
+
         if(orig_parents.size()){
             parents.resize(assertions.size());
             for(unsigned i = 0; i < assertions.size(); i++){
@@ -145,13 +145,13 @@ struct frame_reducer : public iz3mgr {
 
 #else
 struct frame_reducer {
-  
+
 
 
     frame_reducer(context _ctx){
     }
 
-    void get_frames(const std::vector<ast> &z3_preds, 
+    void get_frames(const std::vector<ast> &z3_preds,
                     const std::vector<int> &orig_parents,
                     std::vector<ast> &assertions,
                     std::vector<int> &parents,
@@ -164,12 +164,12 @@ struct frame_reducer {
     }
 };
 
-#endif  
+#endif
 
 
 #if 0
 static lbool test_secondary(context ctx,
-                            int num, 
+                            int num,
                             ast *cnsts,
                             ast *interps,
                             int *parents = 0
@@ -181,14 +181,14 @@ static lbool test_secondary(context ctx,
     if(res == 0)
         std::copy(interpolants.begin(),interpolants.end(),interps);
     return res ? L_TRUE : L_FALSE;
-}                         
+}
 #endif
-    
+
 template<class T>
 struct killme {
     T *p;
     killme(){p = 0;}
-    void set(T *_p) {p = _p;} 
+    void set(T *_p) {p = _p;}
     ~killme(){
         if(p)
             delete p;
@@ -218,7 +218,7 @@ public:
         int res = sp->interpolate(cnsts, interps);
         if(res != 0)
             throw iz3_exception("secondary failed");
-    }                         
+    }
 
     void proof_to_interpolant(z3pf proof,
                               const std::vector<std::vector<ast> > &cnsts,
@@ -243,7 +243,7 @@ public:
 
         int num = cnsts_vec.size();
         std::vector<ast> interps_vec(num-1);
-    
+
         // if this is really a sequence problem, we can make it easier
         if(is_linear(parents_vec))
             parents_vec.clear();
@@ -251,21 +251,21 @@ public:
         // create a secondary prover
         iz3secondary *sp = iz3foci::create(this,num,parents_vec.empty()?0:&parents_vec[0]);
         sp_killer.set(sp); // kill this on exit
-      
+
 #define BINARY_INTERPOLATION
-#ifndef BINARY_INTERPOLATION    
+#ifndef BINARY_INTERPOLATION
         // create a translator
         iz3translation *tr = iz3translation::create(*this,sp,cnsts_vec,parents_vec,theory);
         tr_killer.set(tr);
-    
+
         // set the translation options, if needed
         if(options)
             for(hash_map<std::string,std::string>::iterator it = options->map.begin(), en = options->map.end(); it != en; ++it)
                 tr->set_option(it->first, it->second);
-    
+
         // create a proof object to hold the translation
         iz3proof pf(tr);
-    
+
         profiling::timer_stop("Interpolation prep");
 
         // translate into an interpolatable proof
@@ -283,19 +283,19 @@ public:
             throw interpolation_error();
         }
         profiling::timer_stop("Proof translation");
-    
+
         // translate the proof into interpolants
         profiling::timer_start("Proof interpolation");
         for(int i = 0; i < num-1; i++){
             interps_vec[i] = pf.interpolate(tr->range_downward(i),tr->weak_mode());
-            interps_vec[i] = tr->quantify(interps_vec[i],tr->range_downward(i)); 
+            interps_vec[i] = tr->quantify(interps_vec[i],tr->range_downward(i));
         }
         profiling::timer_stop("Proof interpolation");
 #else
         iz3base the_base(*this,cnsts_vec,parents_vec,theory);
 
         profiling::timer_stop("Interpolation prep");
-    
+
         for(int i = 0; i < num-1; i++){
             range rng = the_base.range_downward(i);
             std::vector<std::vector<ast> > cnsts_vec_vec(2);
@@ -308,15 +308,15 @@ public:
             killme<iz3translation> tr_killer_i;
             iz3translation *tr = iz3translation::create(*this,sp,cnsts_vec_vec,std::vector<int>(),theory);
             tr_killer_i.set(tr);
-    
+
             // set the translation options, if needed
             if(options)
                 for(hash_map<std::string,std::string>::iterator it = options->map.begin(), en = options->map.end(); it != en; ++it)
                     tr->set_option(it->first, it->second);
-      
+
             // create a proof object to hold the translation
             iz3proof pf(tr);
-      
+
             // translate into an interpolatable proof
             profiling::timer_start("Proof translation");
             try {
@@ -332,14 +332,14 @@ public:
                 throw interpolation_error();
             }
             profiling::timer_stop("Proof translation");
-      
+
             // translate the proof into interpolants
             profiling::timer_start("Proof interpolation");
             interps_vec[i] = pf.interpolate(tr->range_downward(0),tr->weak_mode());
-            interps_vec[i] = tr->quantify(interps_vec[i],tr->range_downward(0)); 
+            interps_vec[i] = tr->quantify(interps_vec[i],tr->range_downward(0));
             profiling::timer_stop("Proof interpolation");
         }
-#endif       
+#endif
         // put back in the removed frames
         fr.fix_interpolants(interps_vec);
 
@@ -359,7 +359,7 @@ public:
         for(unsigned i = 0; i < cnsts.size(); i++)
             cnsts_vec[i].push_back(cnsts[i]);
         proof_to_interpolant(proof,cnsts_vec,parents,interps,theory,options);
-    }    
+    }
 
     // same as above, but represents the tree using an ast
 
@@ -370,14 +370,14 @@ public:
                               interpolation_options_struct *options = 0
                               ){
         std::vector<int> pos_map;
-    
+
         // convert to the parents vector representation
-    
+
         to_parents_vec_representation(_cnsts, tree, cnsts, parents, theory, pos_map);
 
         //use the parents vector representation to compute interpolant
         proof_to_interpolant(proof,cnsts,parents,interps,theory,options);
-    
+
         // get the interps for the tree positions
         std::vector<ast> _interps = interps;
         interps.resize(pos_map.size());
@@ -411,9 +411,9 @@ public:
                 collect_conjuncts(cnsts, memo, arg(t,i));
         }
     }
-  
+
     void assert_conjuncts(solver &s, std::vector<ast> &cnsts, const ast &t){
-        hash_map<ast,bool> memo;    
+        hash_map<ast,bool> memo;
         collect_conjuncts(cnsts,memo,t);
         for(unsigned i = 0; i < cnsts.size(); i++)
             s.assert_expr(to_expr(cnsts[i].raw()));

@@ -63,7 +63,7 @@ class ast_i {
  public:
     raw_ast * const &raw() const {return _ast;}
     ast_i(raw_ast *a){_ast = a;}
-  
+
     ast_i(){_ast = 0;}
     bool eq(const ast_i &other) const {
         return _ast == other._ast;
@@ -92,7 +92,7 @@ class ast_r : public ast_i {
         _m = m;
         m->inc_ref(a);
     }
-  
+
     ast_r() {_m = 0;}
 
  ast_r(const ast_r &other) : ast_i(other) {
@@ -113,7 +113,7 @@ class ast_r : public ast_i {
         if(_ast)
             _m->dec_ref(_ast);
     }
-  
+
     ast_manager *mgr() const {return _m;}
 
 };
@@ -136,7 +136,7 @@ namespace std {
         class less<ast_r> {
     public:
         bool operator()(const ast_r &s, const ast_r &t) const {
-            // return s.raw() < t.raw(); 
+            // return s.raw() < t.raw();
             return s.raw()->get_id() < t.raw()->get_id();
         }
     };
@@ -255,7 +255,7 @@ class iz3mgr  {
             return 1;
         case AST_VAR:
             return 0;
-        default:;    
+        default:;
         }
         assert(0);
         return 0;
@@ -273,7 +273,7 @@ class iz3mgr  {
         assert(0);
         return ast();
     }
-  
+
     void get_args(const ast &t, std::vector<ast> &res){
         res.resize(num_args(t));
         for(unsigned i = 0; i < res.size(); i++)
@@ -306,7 +306,7 @@ class iz3mgr  {
     type get_type(ast t){
         return m().get_sort(to_expr(t.raw()));
     }
-  
+
     std::string string_of_numeral(const ast& t){
         rational r;
         expr* e = to_expr(t.raw());
@@ -359,13 +359,13 @@ class iz3mgr  {
     }
 
     bool is_bool_type(type t){
-        family_id fid = to_sort(t)->get_family_id(); 
+        family_id fid = to_sort(t)->get_family_id();
         decl_kind k = to_sort(t)->get_decl_kind();
         return fid == m().get_basic_family_id() && k == BOOL_SORT;
     }
 
     bool is_array_type(type t){
-        family_id fid = to_sort(t)->get_family_id(); 
+        family_id fid = to_sort(t)->get_family_id();
         decl_kind k = to_sort(t)->get_decl_kind();
         return fid == m_array_fid && k == ARRAY_SORT;
     }
@@ -382,7 +382,7 @@ class iz3mgr  {
         return cook(to_func_decl(s)->get_parameters()[idx].get_ast());
     }
 
-    enum lemma_theory {ArithTheory,ArrayTheory,UnknownTheory};
+    enum lemma_theory {ArithTheory,ArrayTheory,BVTheory,UnknownTheory};
 
     lemma_theory get_theory_lemma_theory(const ast &proof){
         symb s = sym(proof);
@@ -394,6 +394,8 @@ class iz3mgr  {
             return ArithTheory;
         if(foo == "array")
             return ArrayTheory;
+        if(foo == "bv")
+            return BVTheory;
         return UnknownTheory;
     }
 
@@ -434,7 +436,7 @@ class iz3mgr  {
     void get_assign_bounds_coeffs(const ast &proof, std::vector<ast>& rats);
 
     void get_assign_bounds_rule_coeffs(const ast &proof, std::vector<rational>& rats);
-  
+
     void get_assign_bounds_rule_coeffs(const ast &proof, std::vector<ast>& rats);
 
     void get_gomory_cut_coeffs(const ast &proof, std::vector<rational>& rats);
@@ -446,7 +448,7 @@ class iz3mgr  {
     bool is_true(ast t){
         return op(t) == True;
     }
-  
+
     bool is_false(ast t){
         return op(t) == False;
     }
@@ -462,7 +464,7 @@ class iz3mgr  {
     bool is_not(ast t){
         return op(t) == Not;
     }
-  
+
     /** Simplify an expression using z3 simplifier */
 
     ast z3_simplify(const ast& e);
@@ -550,7 +552,7 @@ class iz3mgr  {
         if(oy == False && ox == True) return make(False);
         return make(Equal,x,y);
     }
-  
+
     ast z3_ite(ast x, ast y, ast z){
         opr ox = op(x);
         opr oy = op(y);
@@ -592,17 +594,17 @@ class iz3mgr  {
     }
 
     type bool_type() {
-        ::sort *s = m().mk_sort(m_basic_fid, BOOL_SORT); 
+        ::sort *s = m().mk_sort(m_basic_fid, BOOL_SORT);
         return s;
     }
 
     type int_type()  {
-        ::sort *s = m().mk_sort(m_arith_fid, INT_SORT); 
+        ::sort *s = m().mk_sort(m_arith_fid, INT_SORT);
         return s;
     }
 
     type real_type()  {
-        ::sort *s = m().mk_sort(m_arith_fid, REAL_SORT); 
+        ::sort *s = m().mk_sort(m_arith_fid, REAL_SORT);
         return s;
     }
 
@@ -620,7 +622,7 @@ class iz3mgr  {
         ::func_decl* d = m().mk_func_decl(name,arity,&sv[0],range);
         return d;
     }
-  
+
     void linear_comb(ast &P, const ast &c, const ast &Q, bool round_off = false);
 
     ast sum_inequalities(const std::vector<ast> &coeffs, const std::vector<ast> &ineqs, bool round_off = false);
@@ -635,22 +637,22 @@ class iz3mgr  {
     ast mk_idiv(const ast& t, const rational &d);
 
     ast mk_idiv(const ast& t, const ast &d);
-  
+
     /** methods for destructing proof terms */
 
     pfrule pr(const z3pf &t);
 
     int num_prems(const z3pf &t){return to_app(t.raw())->get_num_args()-1;}
-  
+
     z3pf prem(const z3pf &t, int n){return arg(t,n);}
 
     z3pf conc(const z3pf &t){return arg(t,num_prems(t));}
-  
+
 
     /* quantifier handling */
 
     // substitute a term t for unbound occurrences of variable v in e
-  
+
     ast subst(ast var, ast t, ast e);
 
     // apply a substitution defined by a map
@@ -693,7 +695,7 @@ class iz3mgr  {
             m_dt_fid    = m().mk_family_id("datatype");
             m_datalog_fid = m().mk_family_id("datalog_relation");
         }
-  
+
  iz3mgr(const iz3mgr& other)
      : m_manager(other.m_manager),
         m_arith_util(other.m_manager)
@@ -729,5 +731,5 @@ class iz3mgr  {
     arith_util                 m_arith_util;
 };
 
-#endif 
+#endif
 
