@@ -28,7 +28,7 @@ Notes:
 #include "arith_decl_plugin.h"
 #include "bv_decl_plugin.h"
 #include "cmd_context.h"
-
+#include "qsat.h"
 
 namespace opt {
 
@@ -145,6 +145,7 @@ namespace opt {
         ref<solver>         m_solver;
         ref<solver>         m_sat_solver;
         scoped_ptr<pareto_base>          m_pareto;
+        scoped_ptr<qe::qmax> m_qmax;
         sref_vector<model>  m_box_models;
         unsigned            m_box_index;
         params_ref          m_params;
@@ -172,7 +173,6 @@ namespace opt {
         virtual ~context();
         unsigned add_soft_constraint(expr* f, rational const& w, symbol const& id);
         unsigned add_objective(app* t, bool is_max);
-        lbool min_max(app* t, app_ref_vector const& vars, svector<bool> const& is_max);
         void add_hard_constraint(expr* f);
         
 

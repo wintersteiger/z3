@@ -1066,15 +1066,14 @@ extern "C" {
             case OP_BV2INT:    return Z3_OP_BV2INT;
             case OP_CARRY:     return Z3_OP_CARRY;
             case OP_XOR3:      return Z3_OP_XOR3;
-            case OP_BSMUL_NO_OVFL:
-            case OP_BUMUL_NO_OVFL:
-            case OP_BSMUL_NO_UDFL:
-            case OP_BSDIV_I:
-            case OP_BUDIV_I:
-            case OP_BSREM_I:
-            case OP_BUREM_I:
-            case OP_BSMOD_I:
-                return Z3_OP_UNINTERPRETED;
+            case OP_BSMUL_NO_OVFL: return Z3_OP_BSMUL_NO_OVFL;
+            case OP_BUMUL_NO_OVFL: return Z3_OP_BUMUL_NO_OVFL;
+            case OP_BSMUL_NO_UDFL: return Z3_OP_BSMUL_NO_UDFL;
+            case OP_BSDIV_I: return Z3_OP_BSDIV_I;
+            case OP_BUDIV_I: return Z3_OP_BUDIV_I;
+            case OP_BSREM_I: return Z3_OP_BSREM_I;
+            case OP_BUREM_I: return Z3_OP_BUREM_I;
+            case OP_BSMOD_I: return Z3_OP_BSMOD_I;
             default:
                 UNREACHABLE();
                 return Z3_OP_UNINTERPRETED;
@@ -1184,10 +1183,10 @@ extern "C" {
             case OP_FPA_TO_SBV: return Z3_OP_FPA_TO_SBV;
             case OP_FPA_TO_REAL: return Z3_OP_FPA_TO_REAL;
             case OP_FPA_TO_IEEE_BV: return Z3_OP_FPA_TO_IEEE_BV;
+            case OP_FPA_INTERNAL_MIN_I: return Z3_OP_FPA_MIN_I;
+            case OP_FPA_INTERNAL_MAX_I: return Z3_OP_FPA_MAX_I;
+            case OP_FPA_INTERNAL_BV2RM:
             case OP_FPA_INTERNAL_BVWRAP:
-            case OP_FPA_INTERNAL_BVUNWRAP:
-            case OP_FPA_INTERNAL_MIN_I:
-            case OP_FPA_INTERNAL_MAX_I:
             case OP_FPA_INTERNAL_MIN_UNSPECIFIED:
             case OP_FPA_INTERNAL_MAX_UNSPECIFIED:
             case OP_FPA_INTERNAL_TO_UBV_UNSPECIFIED:

@@ -33,6 +33,7 @@ Notes:
 #include "label_rewriter.h"
 #include "expr_replacer.h"
 #include "th_rewriter.h"
+#include "model_evaluator.h"
 
 
 namespace qe {
@@ -154,12 +155,14 @@ namespace qe {
         if (level == 0) {
             return;
         }
+        model_evaluator eval(*mdl);
+
         expr_ref val(m);
         for (unsigned j = 0; j < m_preds[level - 1].size(); ++j) {
             app* p = m_preds[level - 1][j].get();
             TRACE("qe", tout << "process level: " << level - 1 << ": " << mk_pp(p, m) << "\n";);
             
-            VERIFY(mdl->eval(p, val));
+            eval(p, val);
             
             if (m.is_false(val)) {
                 m_asms.push_back(m.mk_not(p));
@@ -179,7 +182,7 @@ namespace qe {
                     (lvl.m_fa == i && (lvl.m_ex == UINT_MAX || lvl.m_ex < level)) ||
                     (lvl.m_ex == i && (lvl.m_fa == UINT_MAX || lvl.m_fa < level));
                 if (use) {
-                    VERIFY(mdl->eval(p, val));
+                    eval(p, val);
                     if (m.is_false(val)) {
                         asms.push_back(m.mk_not(p));
                     }
@@ -503,13 +506,11 @@ namespace qe {
     }
 
     class kernel {
-        ast_manager& m;
         smt_params   m_smtp;
         smt::kernel  m_kernel;
         
     public:
         kernel(ast_manager& m):
-            m(m),
             m_kernel(m, m_smtp)
         {
             m_smtp.m_model = true;
@@ -550,8 +551,7 @@ namespace qe {
             unsigned m_num_rounds;        
             stats() { reset(); }
             void reset() { memset(this, 0, sizeof(*this)); }
-        };
-        
+        };        
         
         ast_manager&               m;
         params_ref                 m_params;
@@ -569,6 +569,9 @@ namespace qe {
         qsat_mode                  m_mode;
         app_ref_vector             m_avars;       // variables to project
         app_ref_vector             m_free_vars;
+        app*                       m_objective;
+        opt::inf_eps*              m_value;
+        bool                       m_was_sat;
 
         
         /**
@@ -578,6 +581,7 @@ namespace qe {
         lbool check_sat() {        
             while (true) {
                 ++m_stats.m_num_rounds;
+                IF_VERBOSE(3, verbose_stream() << "(check-qsat level: " << m_level << " round: " << m_stats.m_num_rounds << ")\n";);
                 check_cancel();
                 expr_ref_vector asms(m_asms);
                 m_pred_abs.get_assumptions(m_model.get(), asms);
@@ -706,96 +710,7 @@ namespace qe {
             for (unsigned i = 0; i < vars.size(); ++i) {
                 m_pred_abs.fmc()->insert(vars[i]->get_decl());
             }
-        }
-
-#if 0
-        void hoist_ite(expr_ref& fml) {
-            app* ite;
-            scoped_ptr<expr_replacer> replace = mk_default_expr_replacer(m);
-            th_rewriter rewriter(m);
-            while (find_ite(fml, ite)) {
-                expr* cond, *th, *el;
-                VERIFY(m.is_ite(ite, cond, th, el));
-                expr_ref tmp1(fml, m), tmp2(fml, m);
-                replace->apply_substitution(cond, m.mk_true(), tmp1);
-                replace->apply_substitution(cond, m.mk_false(), tmp2);
-                fml = m.mk_ite(cond, tmp1, tmp2);
-                rewriter(fml);
-            }
-        }
-
-        bool find_ite(expr* e, app*& ite) {
-            ptr_vector<expr> todo;
-            todo.push_back(e);
-            ast_mark visited;
-            while(!todo.empty()) {
-                e = todo.back();
-                todo.pop_back();
-                if (visited.is_marked(e)) {
-                    continue;
-                }        
-                visited.mark(e, true);
-                if (m.is_ite(e) && !m.is_bool(e)) {
-                    ite = to_app(e);
-                    return true;
-                }
-                if (is_app(e)) {
-                    app* a = to_app(e);
-                    todo.append(a->get_num_args(), a->get_args());
-                }
-            }
-            return false;
-        }
-
-        // slower
-        void hoist_ite2(expr_ref& fml) {
-            obj_map<expr,expr*> result;
-            expr_ref_vector trail(m);
-            ptr_vector<expr> todo, args;
-            todo.push_back(fml);
-            
-            while (!todo.empty()) {
-                expr* e = todo.back();
-                if (result.contains(e)) {
-                    todo.pop_back();
-                    continue;
-                }
-                if (!is_app(e)) {
-                    todo.pop_back();
-                    result.insert(e, e);
-                    continue;
-                }
-                app* a = to_app(e);
-                expr* r;
-                unsigned sz = a->get_num_args();
-                args.reset();
-                for (unsigned i = 0; i < sz; ++i) {
-                    if (result.find(a->get_arg(i), r)) {
-                        args.push_back(r);
-                    }
-                    else {
-                        todo.push_back(a->get_arg(i));
-                    }
-                }
-                if (sz == args.size()) {
-                    r = m.mk_app(a->get_decl(), args.size(), args.c_ptr());
-                    trail.push_back(r);
-                    if (m.is_bool(e) && m.get_basic_family_id() != a->get_family_id()) {
-                        expr_ref fml(r, m);
-                        hoist_ite(fml);
-                        trail.push_back(fml);
-                        r = fml;
-                    }
-                    result.insert(e, r);
-                    todo.pop_back();
-                }                               
-            }
-            fml = result.find(fml);
-        }
-#endif
-
-
-        
+        }        
 
         void initialize_levels() {
             // initialize levels.
@@ -827,11 +742,7 @@ namespace qe {
         void display(std::ostream& out) const {
             out << "level: " << m_level << "\n";
             for (unsigned i = 0; i < m_vars.size(); ++i) {
-                for (unsigned j = 0; j < m_vars[i].size(); ++j) {
-                    expr* v = m_vars[i][j];
-                    out << mk_pp(v, m) << " ";
-                }
-                out << "\n";
+                out << m_vars[i] << "\n";
             }
             m_pred_abs.display(out);
         }
@@ -1162,7 +1073,10 @@ namespace qe {
             m_level(0),
             m_mode(mode),
             m_avars(m),
-            m_free_vars(m)
+            m_free_vars(m),
+            m_objective(0),
+            m_value(0),
+            m_was_sat(false)
         {
             reset();
         }
@@ -1257,6 +1171,9 @@ namespace qe {
         
         void collect_statistics(statistics & st) const {
             st.copy(m_st);
+            m_fa.k().collect_statistics(st);
+            m_ex.k().collect_statistics(st);        
+            m_pred_abs.collect_statistics(st);
             st.update("qsat num rounds", m_stats.m_num_rounds); 
             m_pred_abs.collect_statistics(st);
         }
@@ -1264,7 +1181,7 @@ namespace qe {
         void reset_statistics() {
             m_stats.reset();
             m_fa.k().reset_statistics();
-            m_ex.k().reset_statistics();        
+            m_ex.k().reset_statistics();      
         }
         
         void cleanup() {
@@ -1281,16 +1198,12 @@ namespace qe {
             return alloc(qsat, m, m_params, m_mode);
         }        
 
-        app*             m_objective;
-        opt::inf_eps     m_value;
-        bool             m_was_sat;
-
         lbool maximize(expr_ref_vector const& fmls, app* t, model_ref& mdl, opt::inf_eps& value) {
             expr_ref_vector defs(m);
-            expr_ref fml = negate_core(fmls);
+            expr_ref fml = mk_and(fmls);
             hoist(fml);
             m_objective = t;
-            m_value = opt::inf_eps();
+            m_value = &value;
             m_was_sat = false;
             m_pred_abs.abstract_atoms(fml, defs);
             fml = m_pred_abs.mk_abstract(fml);
@@ -1314,19 +1227,24 @@ namespace qe {
                 if (s == "ok") {
                     s = m_fa.k().last_failure_as_string();
                 }
+
                 throw tactic_exception(s.c_str()); 
             }        
-            value = m_value;
             return l_true;
         }
 
         void maximize(expr_ref_vector const& core, model& mdl) {
+            SASSERT(m_value);
+            SASSERT(m_objective);
             TRACE("qe", tout << "maximize: " << core << "\n";);
             m_was_sat |= !core.empty();
             expr_ref bound(m);
-            m_value = m_mbp.maximize(core, mdl, m_objective, bound);
+            *m_value = m_mbp.maximize(core, mdl, m_objective, bound);
+            IF_VERBOSE(0, verbose_stream() << "(maximize " << *m_value << " bound: " << bound << ")\n";);
             m_ex.assert_expr(bound);            
         }
+
+
 
     };
 
@@ -1335,6 +1253,31 @@ namespace qe {
         qsat qs(m, p, qsat_maximize);
         return qs.maximize(fmls, t, mdl, value);
     }    
+
+
+    struct qmax::imp {
+        qsat m_qsat;
+        imp(ast_manager& m, params_ref const& p):
+            m_qsat(m, p, qsat_maximize)
+        {}        
+    };
+
+    qmax::qmax(ast_manager& m, params_ref const& p) {
+        m_imp = alloc(imp, m, p);        
+    }
+
+    qmax::~qmax() {
+        dealloc(m_imp);
+    }
+    
+    lbool qmax::operator()(expr_ref_vector const& fmls, app* t, opt::inf_eps& value, model_ref& mdl) {
+        return m_imp->m_qsat.maximize(fmls, t, mdl, value);
+    }
+
+    void qmax::collect_statistics(statistics& st) const {
+        m_imp->m_qsat.collect_statistics(st);
+    };
+
 };
 
 tactic * mk_qsat_tactic(ast_manager& m, params_ref const& p) {
@@ -1352,94 +1295,3 @@ tactic * mk_qe_rec_tactic(ast_manager& m, params_ref const& p) {
 
 
 
-#if 0
-
-    class min_max_opt {
-        struct imp;
-        imp* m_imp;
-    public:
-        min_max_opt(ast_manager& m);
-        ~min_max_opt();
-        void add(expr* e);
-        void add(expr_ref_vector const& fmls);
-        lbool check(svector<bool> const& is_max, app_ref_vector const& vars, app* t);
-    };
-
-    struct min_max_opt::imp {
-        ast_manager&    m;
-        expr_ref_vector m_fmls;
-        pred_abs        m_pred_abs;
-        qe::mbp         m_mbp;
-        kernel          m_kernel;
-        vector<app_ref_vector> m_vars;
-
-        imp(ast_manager& m): 
-            m(m), 
-            m_fmls(m), 
-            m_pred_abs(m), 
-            m_mbp(m),
-            m_kernel(m) {}
-
-        void add(expr* e) {
-            m_fmls.push_back(e);
-        }
-
-        lbool check(svector<bool> const& is_max, app_ref_vector const& vars, app* t) {
-            // Assume this is the only call to check.
-            expr_ref_vector defs(m);
-            app_ref_vector free_vars(m), vars1(m);
-            expr_ref fml = mk_and(m_fmls);
-            m_pred_abs.get_free_vars(fml, free_vars);
-            m_pred_abs.abstract_atoms(fml, defs);
-            fml = m_pred_abs.mk_abstract(fml);
-            m_kernel.assert_expr(mk_and(defs));
-            m_kernel.assert_expr(fml);
-            obj_hashtable<app> var_set;
-            for (unsigned i = 0; i < vars.size(); ++i) {
-                var_set.insert(vars[i]);
-            }
-            for (unsigned i = 0; i < free_vars.size(); ++i) {
-                app* v = free_vars[i].get();
-                if (!var_set.contains(v)) {
-                    vars1.push_back(v);
-                }
-            }
-            bool is_m = is_max[0];
-            for (unsigned i = 0; i < vars.size(); ++i) {
-                if (is_m != is_max[i]) {
-                    m_vars.push_back(vars1);
-                    vars1.reset();       
-                    is_m = is_max[i];
-                }
-                vars1.push_back(vars[i]);
-            }
-
-            // TBD
-            
-            return l_undef;
-        }
-    };
-
-    min_max_opt::min_max_opt(ast_manager& m) {
-        m_imp = alloc(imp, m);
-    }
-
-    min_max_opt::~min_max_opt() {
-        dealloc(m_imp);
-    }
-
-    void min_max_opt::add(expr* e) {
-        m_imp->add(e);
-    }
-
-    void min_max_opt::add(expr_ref_vector const& fmls) {
-        for (unsigned i = 0; i < fmls.size(); ++i) {
-            add(fmls[i]);
-        }
-    }
-
-    lbool min_max_opt::check(svector<bool> const& is_max, app_ref_vector const& vars, app* t) {
-        return m_imp->check(is_max, vars, t);
-    }
-
-#endif

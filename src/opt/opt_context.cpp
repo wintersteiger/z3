@@ -212,20 +212,6 @@ namespace opt {
         m_hard_constraints.append(s.m_hard);
     }
 
-    lbool context::min_max(app* t, app_ref_vector const& vars, svector<bool> const& is_max) {
-        clear_state();
-        init_solver(); 
-        import_scoped_state(); 
-        normalize();
-        internalize();
-        update_solver();
-        solver& s = get_solver();
-        s.assert_expr(m_hard_constraints);
-        std::cout << "min-max is TBD\n";
-        return l_undef;
-    }
-
-
     lbool context::optimize() {
         if (m_pareto) {
             return execute_pareto();
@@ -238,12 +224,12 @@ namespace opt {
         import_scoped_state(); 
         normalize();
         internalize();
+        update_solver();
 #if 0
         if (is_qsat_opt()) {
             return run_qsat_opt();
         }
 #endif
-        update_solver();
         solver& s = get_solver();
         s.assert_expr(m_hard_constraints);
         display_benchmark();
@@ -1314,6 +1300,9 @@ namespace opt {
         }        
         get_memory_statistics(stats);
         get_rlimit_statistics(m.limit(), stats);
+        if (m_qmax) {
+            m_qmax->collect_statistics(stats);
+        }
     }
 
     void context::collect_param_descrs(param_descrs & r) {
@@ -1454,6 +1443,9 @@ namespace opt {
             m_objectives[0].m_type != O_MINIMIZE) {
             return false;
         }
+        if (!m_arith.is_real(m_objectives[0].m_term)) {
+            return false;
+        }
         for (unsigned i = 0; i < m_hard_constraints.size(); ++i) {
             if (has_quantifiers(m_hard_constraints[i].get())) {
                 return true;
@@ -1470,11 +1462,21 @@ namespace opt {
             term = m_arith.mk_uminus(term);
         }
         inf_eps value;
-        lbool result = qe::maximize(m_hard_constraints, term, value, m_model, m_params);
+        m_qmax = alloc(qe::qmax, m, m_params);
+        lbool result = (*m_qmax)(m_hard_constraints, term, value, m_model);
         if (result != l_undef && obj.m_type == O_MINIMIZE) {
             value.neg();
         }
-        if (result != l_undef) {
+        m_optsmt.setup(*m_opt_solver.get());
+        if (result == l_undef) {
+            if (obj.m_type == O_MINIMIZE) {
+                m_optsmt.update_upper(obj.m_index, value);
+            }
+            else {
+                m_optsmt.update_lower(obj.m_index, value);
+            }
+        }
+        else {
             m_optsmt.update_lower(obj.m_index, value);
             m_optsmt.update_upper(obj.m_index, value);
         }

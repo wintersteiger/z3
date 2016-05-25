@@ -24,6 +24,11 @@ Notes:
 #include"ref_util.h"
 #include"fpa_decl_plugin.h"
 #include"bv_decl_plugin.h"
+#include"array_decl_plugin.h"
+#include"datatype_decl_plugin.h"
+#include"dl_decl_plugin.h"
+#include"pb_decl_plugin.h"
+#include"seq_decl_plugin.h"
 #include"basic_simplifier_plugin.h"
 
 class fpa2bv_converter {
@@ -33,6 +38,9 @@ protected:
     fpa_util                   m_util;
     bv_util                    m_bv_util;
     arith_util                 m_arith_util;
+    array_util                 m_array_util;
+    datatype_util              m_dt_util;
+    seq_util                   m_seq_util;
     mpf_manager              & m_mpf_manager;
     unsynch_mpz_manager      & m_mpz_manager;
     fpa_decl_plugin          * m_plugin;
@@ -40,7 +48,7 @@ protected:
 
     obj_map<func_decl, expr*>  m_const2bv;
     obj_map<func_decl, expr*>  m_rm_const2bv;
-    obj_map<func_decl, func_decl*>  m_uf2bvuf;
+    obj_map<func_decl, func_decl*>  m_uf2bvuf;    
 
     obj_map<func_decl, std::pair<app *, app *> > m_specials;
 
@@ -59,12 +67,9 @@ public:
     bool is_rm(expr * e) { return is_app(e) && m_util.is_rm(e); }
     bool is_rm(sort * s) { return m_util.is_rm(s); }
     bool is_float_family(func_decl * f) { return f->get_family_id() == m_util.get_family_id(); }
-
-    void mk_rm(expr * bv3, expr_ref & result);
-
-    void mk_fp(expr * sign, expr * exponent, expr * significand, expr_ref & result);
+    
     void mk_fp(func_decl * f, unsigned num, expr * const * args, expr_ref & result);
-
+    
     void split_fp(expr * e, expr * & sgn, expr * & exp, expr * & sig) const;
     void split_fp(expr * e, expr_ref & sgn, expr_ref & exp, expr_ref & sig) const;
 
@@ -72,11 +77,11 @@ public:
     void mk_ite(expr * c, expr * t, expr * f, expr_ref & result);
     void mk_distinct(func_decl * f, unsigned num, expr * const * args, expr_ref & result);
 
-    void mk_rounding_mode(func_decl * f, expr_ref & result);
+    void mk_rounding_mode(decl_kind k, expr_ref & result);
     void mk_numeral(func_decl * f, unsigned num, expr * const * args, expr_ref & result);
     virtual void mk_const(func_decl * f, expr_ref & result);
     virtual void mk_rm_const(func_decl * f, expr_ref & result);
-    virtual void mk_uninterpreted_function(func_decl * f, unsigned num, expr * const * args, expr_ref & result);
+    virtual void mk_function(func_decl * f, unsigned num, expr * const * args, expr_ref & result);
     void mk_var(unsigned base_inx, sort * srt, expr_ref & result);
 
     void mk_pinf(func_decl * f, expr_ref & result);
@@ -128,11 +133,10 @@ public:
 
     void mk_min(func_decl * f, unsigned num, expr * const * args, expr_ref & result);
     void mk_min_i(func_decl * f, unsigned num, expr * const * args, expr_ref & result);
-    virtual expr_ref mk_min_unspecified(func_decl * f, expr * x, expr * y);
+    virtual expr_ref mk_min_max_unspecified(func_decl * f, expr * x, expr * y);
 
     void mk_max(func_decl * f, unsigned num, expr * const * args, expr_ref & result);
     void mk_max_i(func_decl * f, unsigned num, expr * const * args, expr_ref & result);
-    virtual expr_ref mk_max_unspecified(func_decl * f, expr * x, expr * y);
 
     expr_ref mk_to_ubv_unspecified(unsigned ebits, unsigned sbits, unsigned width);
     expr_ref mk_to_sbv_unspecified(unsigned ebits, unsigned sbits, unsigned width);
@@ -143,6 +147,9 @@ public:
 
     void dbg_decouple(const char * prefix, expr_ref & e);
     expr_ref_vector m_extra_assertions;
+
+    bool is_special(func_decl * f) { return m_specials.contains(f); }
+    bool is_uf2bvuf(func_decl * f) { return m_uf2bvuf.contains(f); }    
 
 protected:
     void mk_one(func_decl *f, expr_ref & sign, expr_ref & result);
@@ -183,7 +190,11 @@ protected:
 
     void mk_to_bv(func_decl * f, unsigned num, expr * const * args, bool is_signed, expr_ref & result);
 
-    void mk_uninterpreted_output(sort * rng, func_decl * fbv, expr_ref_buffer & new_args, expr_ref & result);
+    sort_ref replace_float_sorts(sort * s);
+    func_decl_ref replace_function(func_decl * f);
+    expr_ref replace_float_arg(expr * a);
+    void mk_function_output(sort * rng, func_decl * fbv, expr * const * new_args, expr_ref & result);
+    func_decl * get_bv_uf(func_decl * f, sort * bv_rng, unsigned arity);
 
 private:
     void mk_nan(sort * s, expr_ref & result);
@@ -201,6 +212,8 @@ private:
     void mk_div(sort * s, expr_ref & bv_rm, expr_ref & x, expr_ref & y, expr_ref & result);
     void mk_rem(sort * s, expr_ref & x, expr_ref & y, expr_ref & result);
     void mk_round_to_integral(sort * s, expr_ref & rm, expr_ref & x, expr_ref & result);
+
+    void mk_to_fp_float(sort * s, expr * rm, expr * x, expr_ref & result);
 };
 
 #endif
