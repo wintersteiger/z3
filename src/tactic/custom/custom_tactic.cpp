@@ -41,6 +41,16 @@ public:
         m_t->inc_ref();
     }
 
+    virtual void updt_params(params_ref const & p) { if (m_t) m_t->updt_params(p); }
+    virtual void collect_param_descrs(param_descrs & r) { if (m_t) m_t->collect_param_descrs(r); }
+    virtual void collect_statistics(statistics & st) const { if (m_t) m_t->collect_statistics(st); }
+    virtual void reset_statistics() { if (m_t) m_t->reset_statistics(); }
+    virtual void cleanup() { if (m_t) m_t->cleanup();  };
+    virtual void reset() { if (m_t) m_t->reset(); }
+    virtual void set_logic(symbol const & l) { if (m_t) m_t->set_logic(l); }
+    virtual void set_progress_callback(progress_callback * callback) { if (m_t) m_t->set_progress_callback(callback); }
+    virtual tactic * translate(ast_manager & m) { return m_t ? m_t->translate(m) : 0; };
+
     virtual void operator()(goal_ref const & in,
         goal_ref_buffer & result,
         model_converter_ref & mc,
