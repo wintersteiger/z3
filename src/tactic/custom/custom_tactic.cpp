@@ -28,7 +28,7 @@ Notes:
 #include"max_bv_sharing_tactic.h"
 #include"ackermannize_bv_tactic.h"
 #include"qfbv_tactic.h"
-
+#include"qfufbv_tactic.h"
 
 class print_info_tactic : public skip_tactic {
     tactic * m_t;
@@ -56,15 +56,19 @@ public:
         model_converter_ref & mc,
         proof_converter_ref & pc,
         expr_dependency_ref & core) {
-        tactic_exception * te = 0;
+        
+        bool have_exception = false;
+        tactic_exception te("");
 
         IF_VERBOSE(m_lvl, verbose_stream() << "(start " << m_msg << ")\n";);
 
         try {
+            have_exception = false;
             (*m_t)(in, result, mc, pc, core);
         }
-        catch (tactic_exception ex) {
-            te = &ex;            
+        catch (tactic_exception & ex) {
+            have_exception = true;            
+            te = ex;
         }
 
         if (is_decided_sat(result))
@@ -75,7 +79,7 @@ public:
             std::cout << "unknown" << std::endl;
 
         IF_VERBOSE(m_lvl, verbose_stream() << "(end " << m_msg << ")\n";);
-        if (te) throw * te;
+        if (have_exception) throw te;
     }
 };
 
@@ -94,7 +98,7 @@ tactic * mk_custom_tactic(ast_manager & m, params_ref const & p) {
     params_ref prms = p;
     prms.set_bool("elim_and", true);
     prms.set_bool("blast_distinct", true);
-    prms.set_str("smt.logic", "QF_UFBV");
+    prms.set_str("smt.logic", "QF_UFBV");    
 
     tactic * st =
         mk_print_info_tactic(
@@ -107,12 +111,18 @@ tactic * mk_custom_tactic(ast_manager & m, params_ref const & p) {
                         mk_elim_uncnstr_tactic(m),
                         mk_reduce_args_tactic(m),
                         mk_simplify_tactic(m),
-                        mk_bv_size_reduction_tactic(m)),
+                        mk_bv_size_reduction_tactic(m)
+                        //mk_ackermannize_bv_tactic(m, p), 
+                        ),
                     and_then(
                         mk_max_bv_sharing_tactic(m),
-                        cond(mk_is_qfbv_probe(), mk_qfbv_tactic(m, p), mk_smt_tactic(p)))
+                        //mk_qfufbv_ackr_tactic(m, p)
+                        cond(mk_is_qfbv_probe(), mk_qfbv_tactic(m, p), mk_smt_tactic(p))
+                    )
                 ), prms),
-            2, "custom");
+            2, "custom");    
+
+    //tactic * st = mk_print_info_tactic(mk_skip_tactic(), 2, "nothing");
 
     st->updt_params(p);
     return st;
