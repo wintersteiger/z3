@@ -29,6 +29,8 @@ Notes:
 #include"ackermannize_bv_tactic.h"
 #include"qfbv_tactic.h"
 #include"qfufbv_tactic.h"
+#include"ast_pp_util.h"
+
 
 class print_info_tactic : public skip_tactic {
     tactic * m_t;
@@ -39,6 +41,10 @@ public:
     print_info_tactic(tactic * t, unsigned lvl, const char * msg) : m_t(t), m_lvl(lvl), m_msg(msg) {
         SASSERT(m_t);
         m_t->inc_ref();
+    }
+
+    ~print_info_tactic() {
+        m_t->dec_ref();
     }
 
     virtual void updt_params(params_ref const & p) { if (m_t) m_t->updt_params(p); }
@@ -56,6 +62,18 @@ public:
         model_converter_ref & mc,
         proof_converter_ref & pc,
         expr_dependency_ref & core) {
+
+        if (0) {
+            std::cerr << "; printing smt" << std::endl;
+            expr_ref_vector fmls(in->m());
+            unsigned sz = in->size();
+            for (unsigned i = 0; i < sz; i++) fmls.push_back(in->form(i));
+            ast_pp_util visitor(in->m());
+            visitor.collect(fmls);
+            visitor.display_decls(std::cerr);
+            visitor.display_asserts(std::cerr, fmls, true);
+        }
+
         
         bool have_exception = false;
         tactic_exception te("");
@@ -87,6 +105,15 @@ tactic * mk_print_info_tactic(tactic * t, unsigned lvl, const char * msg) {
     return alloc(print_info_tactic, t, lvl, msg);
 }
 
+tactic * mk_ackr(ast_manager & m, params_ref const & p) {
+    params_ref prms = p;
+    prms.set_str("smt.logic", "QF_UFBV");
+    return mk_print_info_tactic(
+        using_params(mk_qfufbv_ackr_tactic(m, p), prms),
+        2, "custom"
+    );
+}
+
 
 tactic * mk_custom_tactic(ast_manager & m, params_ref const & p) {
     // #ifdef USE_ARRAY_TH
@@ -100,7 +127,8 @@ tactic * mk_custom_tactic(ast_manager & m, params_ref const & p) {
     prms.set_bool("blast_distinct", true);
     prms.set_str("smt.logic", "QF_UFBV");    
 
-    tactic * st =
+    tactic * st = 0 ? mk_ackr(m, p)
+        :
         mk_print_info_tactic(
             using_params(
                 and_then(
