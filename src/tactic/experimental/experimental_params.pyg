@@ -1,0 +1,5 @@
+def_module_params(module_name='experimental',
+                  class_name='experimental_tactic_params',
+                  export=True,
+                  params=(("drop_patterns", BOOL, False, "drop patterns from quantifiers"),
+                          ))
