@@ -22,6 +22,7 @@ Notes:
 #include"scoped_timer.h"
 #include"combined_solver_params.hpp"
 #include"common_msgs.h"
+#include"event_handler.h"
 #define PS_VB_LVL 15
 
 /**

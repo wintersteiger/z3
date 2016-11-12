@@ -21,7 +21,8 @@ Notes:
 
 #include<iostream>
 #include"vector.h"
-#include"rlimit.h"
+
+class reslimit;
 
 class statistics {
     typedef std::pair<char const *, unsigned> key_val_pair;

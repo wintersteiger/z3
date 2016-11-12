@@ -19,7 +19,6 @@ Revision History:
 #ifndef PTR_SCOPED_BUFFER_H_
 #define PTR_SCOPED_BUFFER_H_
 
-#include"util.h"
 #include"debug.h"
 #include"buffer.h"
 

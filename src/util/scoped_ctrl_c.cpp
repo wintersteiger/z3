@@ -17,7 +17,7 @@ Revision History:
 
 --*/
 #include<signal.h>
-#include<iostream>
+#include"event_handler.h"
 #include"scoped_ctrl_c.h"
 
 scoped_ctrl_c * scoped_ctrl_c::g_obj = 0;

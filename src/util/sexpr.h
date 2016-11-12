@@ -19,11 +19,12 @@ Notes:
 #ifndef SEXPR_H_
 #define SEXPR_H_
 
-#include"rational.h"
-#include"symbol.h"
+#include"small_object_allocator.h"
 #include"obj_ref.h"
 #include"ref_vector.h"
 
+class symbol;
+class rational;
 class sexpr_manager;
 
 class sexpr {

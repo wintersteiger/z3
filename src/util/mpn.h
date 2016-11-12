@@ -20,7 +20,6 @@ Revision History:
 #define MPN_H_
 
 #include<ostream>
-#include"util.h"
 #include"buffer.h"
 #include"z3_omp.h"
 

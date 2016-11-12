@@ -22,6 +22,7 @@ Revision History:
 #endif
 
 #include"z3_exception.h"
+#include"event_handler.h"
 #include"z3_omp.h"
 #if defined(_WINDOWS) || defined(_CYGWIN)
 // Windows

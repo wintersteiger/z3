@@ -19,8 +19,9 @@ Revision History:
 #ifndef SCOPED_CTRL_C_H_
 #define SCOPED_CTRL_C_H_
 
-#include"event_handler.h"
 #include"util.h"
+
+class event_handler;
 
 struct scoped_ctrl_c {
     event_handler & m_cancel_eh;

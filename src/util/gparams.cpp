@@ -17,6 +17,7 @@ Notes:
 
 --*/
 #include"gparams.h"
+#include"params.h"
 #include"dictionary.h"
 #include"trace.h"
 

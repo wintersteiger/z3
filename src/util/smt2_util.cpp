@@ -16,6 +16,7 @@ Author:
 Notes:
 
 --*/
+#include"symbol.h"
 #include"smt2_util.h"
 
 bool is_smt2_simple_symbol_char(char s) {

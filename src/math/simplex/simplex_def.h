@@ -22,6 +22,7 @@ Notes:
 #ifndef SIMPLEX_DEF_H_
 #define SIMPLEX_DEF_H_
 
+#include"rlimit.h"
 
 namespace simplex {
 

@@ -20,7 +20,6 @@ Revision History:
 #define SYMBOL_TABLE_H_
 #include"vector.h"
 #include"hashtable.h"
-#include"hash.h"
 #include"symbol.h"
 
 /**

@@ -16,6 +16,7 @@ Author:
 Notes:
 
 --*/
+#include"rlimit.h"
 #include"statistics.h"
 #include"map.h"
 #include"str_hashtable.h"

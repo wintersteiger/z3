@@ -19,7 +19,10 @@ Notes:
 #ifndef GPARAMS_H_
 #define GPARAMS_H_
 
-#include"params.h"
+#include"cmd_context_types.h"
+
+class params_ref; 
+class param_descrs;
 
 class gparams {
     struct imp;

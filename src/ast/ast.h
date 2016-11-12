@@ -20,16 +20,13 @@ Revision History:
 #define AST_H_
 
 #include"vector.h"
-#include"hashtable.h"
 #include"buffer.h"
 #include"symbol.h"
 #include"rational.h"
 #include"hash.h"
 #include"optional.h"
-#include"trace.h"
 #include"bit_vector.h"
 #include"symbol_table.h"
-#include"tptr.h"
 #include"memory_manager.h"
 #include"small_object_allocator.h"
 #include"obj_ref.h"

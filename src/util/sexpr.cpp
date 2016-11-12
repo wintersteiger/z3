@@ -16,6 +16,8 @@ Author:
 Notes:
 
 --*/
+#include"rational.h"
+#include"symbol.h"
 #include"sexpr.h"
 #include"vector.h"
 #include"buffer.h"

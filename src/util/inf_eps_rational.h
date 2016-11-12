@@ -21,7 +21,7 @@ Revision History:
 #include<stdlib.h>
 #include<string>
 #include"debug.h"
-#include"vector.h"
+//#include"vector.h"
 #include"rational.h"
 #include"inf_rational.h"
 
