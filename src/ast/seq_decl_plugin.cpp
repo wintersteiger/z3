@@ -112,6 +112,11 @@ zstring::zstring(zstring const& other) {
     m_encoding = other.m_encoding;
 }
 
+zstring::zstring(unsigned sz, unsigned const* s, encoding enc) {
+    m_buffer.append(sz, s);
+    m_encoding = enc;
+}
+
 zstring::zstring(unsigned num_bits, bool const* ch) {
     SASSERT(num_bits == 8 || num_bits == 16);
     m_encoding = (num_bits == 8)?ascii:unicode;
@@ -137,6 +142,9 @@ zstring& zstring::operator=(zstring const& other) {
 zstring zstring::replace(zstring const& src, zstring const& dst) const {
     zstring result(m_encoding);
     if (length() < src.length()) {
+        return zstring(*this);
+    }
+    if (src.length() == 0) {
         return zstring(*this);
     }
     bool found = false;
@@ -272,13 +280,12 @@ bool seq_decl_plugin::is_sort_param(sort* s, unsigned& idx) {
 }
 
 bool seq_decl_plugin::match(ptr_vector<sort>& binding, sort* s, sort* sP) {
-    ast_manager& m = *m_manager;
     if (s == sP) return true;
     unsigned i;
     if (is_sort_param(sP, i)) {
         if (binding.size() <= i) binding.resize(i+1);
         if (binding[i] && (binding[i] != s)) return false;
-        TRACE("seq_verbose", tout << "setting binding @ " << i << " to " << mk_pp(s, m) << "\n";);
+        TRACE("seq_verbose", tout << "setting binding @ " << i << " to " << mk_pp(s, *m_manager) << "\n";);
         binding[i] = s;
         return true;
     }
@@ -297,7 +304,7 @@ bool seq_decl_plugin::match(ptr_vector<sort>& binding, sort* s, sort* sP) {
         return true;
     }
     else {
-        TRACE("seq", tout << "Could not match " << mk_pp(s, m) << " and " << mk_pp(sP, m) << "\n";);
+        TRACE("seq", tout << "Could not match " << mk_pp(s, *m_manager) << " and " << mk_pp(sP, *m_manager) << "\n";);
         return false;
     }
 }
@@ -548,7 +555,7 @@ func_decl* seq_decl_plugin::mk_assoc_fun(decl_kind k, unsigned arity, sort* cons
     }
     match_right_assoc(*m_sigs[k], arity, domain, range, rng);
     func_decl_info info(m_family_id, k_seq);
-    info.set_right_associative();
+    info.set_right_associative(true);
     return m.mk_func_decl(m_sigs[(rng == m_string)?k_string:k_seq]->m_name, rng, rng, rng, info);
 }
 
@@ -578,6 +585,7 @@ func_decl * seq_decl_plugin::mk_func_decl(decl_kind k, unsigned num_parameters, 
     case OP_RE_OF_PRED:
     case OP_STRING_ITOS:
     case OP_STRING_STOI:
+    case OP_RE_COMPLEMENT:
         match(*m_sigs[k], arity, domain, range, rng);
         return m.mk_func_decl(m_sigs[k]->m_name, arity, domain, rng, func_decl_info(m_family_id, k));
 
@@ -632,7 +640,7 @@ func_decl * seq_decl_plugin::mk_func_decl(decl_kind k, unsigned num_parameters, 
         default:
             m.raise_exception("Incorrect number of arguments passed to loop. Expected 1 regular expression and two integer parameters");
         }
-
+        
 
     case OP_STRING_CONST:
         if (!(num_parameters == 1 && arity == 0 && parameters[0].is_symbol())) {
@@ -641,7 +649,6 @@ func_decl * seq_decl_plugin::mk_func_decl(decl_kind k, unsigned num_parameters, 
         return m.mk_const_decl(m_stringc_sym, m_string,
                                func_decl_info(m_family_id, OP_STRING_CONST, num_parameters, parameters));
 
-    case OP_RE_COMPLEMENT:
     case OP_RE_UNION:
     case OP_RE_CONCAT:
     case OP_RE_INTERSECT:
@@ -761,10 +768,27 @@ app* seq_decl_plugin::mk_string(zstring const& s) {
 
 
 bool seq_decl_plugin::is_value(app* e) const {
-    return
-        is_app_of(e, m_family_id, OP_SEQ_EMPTY) ||
-        (is_app_of(e, m_family_id, OP_SEQ_UNIT) &&
-         m_manager->is_value(e->get_arg(0)));
+    while (true) {
+        if (is_app_of(e, m_family_id, OP_SEQ_EMPTY)) {
+            return true;
+        }
+        if (is_app_of(e, m_family_id, OP_STRING_CONST)) {
+            return true;
+        }
+        if (is_app_of(e, m_family_id, OP_SEQ_UNIT) &&
+            m_manager->is_value(e->get_arg(0))) {
+            return true;
+        }
+        if (is_app_of(e, m_family_id, OP_SEQ_CONCAT) &&
+            e->get_num_args() == 2 && 
+            is_app(e->get_arg(0)) &&
+            is_app(e->get_arg(1)) &&
+            is_value(to_app(e->get_arg(0)))) {
+            e = to_app(e->get_arg(1));
+            continue;
+        }
+        return false;
+    }
 }
 
 expr* seq_decl_plugin::get_some_value(sort* s) {
@@ -799,16 +823,6 @@ app*  seq_util::str::mk_char(zstring const& s, unsigned idx) {
 app*  seq_util::str::mk_char(char ch) {
     zstring s(ch, zstring::ascii);
     return mk_char(s, 0);
-}
-
-bool seq_util::str::is_char(expr* n, zstring& c) const {
-    if (u.is_char(n)) {
-        c = zstring(to_app(n)->get_decl()->get_parameter(0).get_symbol().bare_str());
-        return true;
-    }
-    else {
-        return false;
-    }
 }
 
 bool seq_util::str::is_string(expr const* n, zstring& s) const {

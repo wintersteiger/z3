@@ -42,6 +42,7 @@ add_executable(test-z3
   factor_rewriter.cpp
   fixed_bit_vector.cpp
   for_each_file.cpp
+  get_consequences.cpp
   get_implied_equalities.cpp
   "${CMAKE_CURRENT_BINARY_DIR}/gparams_register_modules.cpp"
   hashtable.cpp
@@ -61,6 +62,7 @@ add_executable(test-z3
   "${CMAKE_CURRENT_BINARY_DIR}/mem_initializer.cpp"
   memory.cpp
   model2expr.cpp
+  model_based_opt.cpp
   model_evaluator.cpp
   model_retrieval.cpp
   mpbq.cpp
@@ -76,6 +78,7 @@ add_executable(test-z3
   old_interval.cpp
   optional.cpp
   parray.cpp
+  pb2bv.cpp
   pdr.cpp
   permutation.cpp
   polynomial.cpp

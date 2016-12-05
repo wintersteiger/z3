@@ -417,8 +417,8 @@ namespace smt {
     template<typename Ext>
     void theory_arith<Ext>::atom::display(theory_arith<Ext> const& th, std::ostream& out) const {
         literal l(get_bool_var(), !m_is_true);
-        out << "v" << bound::get_var() << " " << bound::get_bound_kind() << " " << get_k() << " ";
-        out << l << ":";
+        // out << "v" << bound::get_var() << " " << bound::get_bound_kind() << " " << get_k() << " ";
+        // out << l << ":";
         th.get_context().display_detailed_literal(out, l);
     }
 
@@ -813,7 +813,7 @@ namespace smt {
                 continue;
             if (proofs_enabled()) {
                 new_bound.push_lit(l, ante.lit_coeffs()[i]);
-            }			
+            }
             else {
                 new_bound.push_lit(l, numeral::zero());
                 lits.insert(l.index());
@@ -1056,6 +1056,11 @@ namespace smt {
     inf_eps_rational<inf_rational> theory_arith<Ext>::maximize(theory_var v, expr_ref& blocker, bool& has_shared) {
         TRACE("bound_bug", display_var(tout, v); display(tout););
         has_shared = false;
+        if (!m_nl_monomials.empty()) {
+            has_shared = true;
+            blocker = mk_gt(v);
+            return inf_eps_rational<inf_rational>(get_value(v));            
+        }
         max_min_t r = max_min(v, true, true, has_shared); 
         if (r == UNBOUNDED) {
             has_shared = false;
@@ -1300,6 +1305,7 @@ namespace smt {
 
     */
 
+
     
     template<typename Ext>
     bool theory_arith<Ext>::pick_var_to_leave(
@@ -1331,7 +1337,7 @@ namespace smt {
             if (update_gains(inc, s, coeff_ij, min_gain, max_gain) ||
                 (x_i == null_theory_var && !unbounded_gain(max_gain))) {
                 x_i = s;
-                a_ij = coeff_ij;
+                a_ij = coeff_ij;                
             }
             has_shared |= ctx.is_shared(get_enode(s));
         }
@@ -1342,6 +1348,7 @@ namespace smt {
               tout << "v" << x_i << " ";
               tout << (has_shared?"shared":"not shared") << "\n";);
 
+        (void) empty_column;
         SASSERT(!safe_gain(min_gain, max_gain) ||
                 empty_column ||
                 (unbounded_gain(max_gain) == (x_i == null_theory_var)));
@@ -1708,7 +1715,7 @@ namespace smt {
             SASSERT(!maintain_integrality || valid_assignment());
             SASSERT(satisfy_bounds());
         }
-        TRACE("opt", display(tout););
+        TRACE("opt_verbose", display(tout););
         return (best_efforts>0 || ctx.get_cancel_flag())?BEST_EFFORT:result;
     }
 
@@ -1784,7 +1791,7 @@ namespace smt {
     template<typename Ext>
    typename theory_arith<Ext>::max_min_t theory_arith<Ext>::max_min(theory_var v, bool max, bool maintain_integrality, bool& has_shared) {
         expr* e = get_enode(v)->get_owner();
-
+        (void)e;
         SASSERT(!maintain_integrality || valid_assignment());
         SASSERT(satisfy_bounds());
         SASSERT(!is_quasi_base(v));

@@ -97,7 +97,7 @@ void help_tactic(cmd_context & ctx) {
     buf << "- (or-else <tactic>+) tries the given tactics in sequence until one of them succeeds (i.e., the first that doesn't fail).\n";
     buf << "- (par-or <tactic>+) executes the given tactics in parallel until one of them succeeds (i.e., the first that doesn't fail).\n";
     buf << "- (par-then <tactic1> <tactic2>) executes tactic1 and then tactic2 to every subgoal produced by tactic1. All subgoals are processed in parallel.\n";
-    buf << "- (try-for <tactic> <num>) excutes the given tactic for at most <num> milliseconds, it fails if the execution takes more than <num> milliseconds.\n";
+    buf << "- (try-for <tactic> <num>) executes the given tactic for at most <num> milliseconds, it fails if the execution takes more than <num> milliseconds.\n";
     buf << "- (if <probe> <tactic> <tactic>) if <probe> evaluates to true, then execute the first tactic. Otherwise execute the second.\n";
     buf << "- (when <probe> <tactic>) shorthand for (if <probe> <tactic> skip).\n";
     buf << "- (fail-if <probe>) fail if <probe> evaluates to true.\n";
@@ -288,9 +288,7 @@ public:
 #endif
         p.insert("print_model_converter", CPK_BOOL, "(default: false) print model converter.");
         p.insert("print_benchmark", CPK_BOOL, "(default: false) display resultant goals as a SMT2 benchmark.");
-#ifndef _EXTERNAL_RELEASE
         p.insert("print_dependencies", CPK_BOOL, "(default: false) print dependencies when displaying the resultant set of goals.");
-#endif
         exec_given_tactic_cmd::init_pdescrs(ctx, p);
     }
 
@@ -303,8 +301,8 @@ public:
             goal_ref g = alloc(goal, m, ctx.produce_proofs(), ctx.produce_models(), ctx.produce_unsat_cores());
             assert_exprs_from(ctx, *g);
 
-            unsigned timeout   = p.get_uint("timeout", UINT_MAX);
-            unsigned rlimit  =   p.get_uint("rlimit", 0);
+            unsigned timeout   = p.get_uint("timeout", ctx.params().m_timeout);
+            unsigned rlimit  =   p.get_uint("rlimit", ctx.params().m_rlimit);
 
             goal_ref_buffer     result_goals;
             model_converter_ref mc;

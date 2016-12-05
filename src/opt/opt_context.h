@@ -28,7 +28,7 @@ Notes:
 #include "arith_decl_plugin.h"
 #include "bv_decl_plugin.h"
 #include "cmd_context.h"
-
+#include "qsat.h"
 
 namespace opt {
 
@@ -48,7 +48,7 @@ namespace opt {
         virtual filter_model_converter& fm() = 0;   // converter that removes fresh names introduced by simplification.
         virtual bool sat_enabled() const = 0;       // is using th SAT solver core enabled?
         virtual solver& get_solver() = 0;           // retrieve solver object (SAT or SMT solver)
-        virtual ast_manager& get_manager() = 0;      
+        virtual ast_manager& get_manager() const = 0;      
         virtual params_ref& params() = 0;
         virtual void enable_sls(bool force) = 0;              // stochastic local search 
         virtual symbol const& maxsat_engine() const = 0; // retrieve maxsat engine configuration parameter.
@@ -145,6 +145,7 @@ namespace opt {
         ref<solver>         m_solver;
         ref<solver>         m_sat_solver;
         scoped_ptr<pareto_base>          m_pareto;
+        scoped_ptr<qe::qmax> m_qmax;
         sref_vector<model>  m_box_models;
         unsigned            m_box_index;
         params_ref          m_params;
@@ -174,6 +175,8 @@ namespace opt {
         unsigned add_objective(app* t, bool is_max);
         void add_hard_constraint(expr* f);
         
+        void get_hard_constraints(expr_ref_vector& hard);
+        expr_ref get_objective(unsigned i);
 
         virtual void push();
         virtual void pop(unsigned n);
@@ -207,7 +210,7 @@ namespace opt {
         std::string to_string() const;
 
 
-        virtual unsigned num_objectives() { return m_objectives.size(); }
+        virtual unsigned num_objectives() { return m_scoped_state.m_objectives.size(); }       
         virtual expr_ref mk_gt(unsigned i, model_ref& model);
         virtual expr_ref mk_ge(unsigned i, model_ref& model);
         virtual expr_ref mk_le(unsigned i, model_ref& model);
@@ -216,7 +219,7 @@ namespace opt {
         virtual filter_model_converter& fm() { return m_fm; }
         virtual bool sat_enabled() const { return 0 != m_sat_solver.get(); }
         virtual solver& get_solver();
-        virtual ast_manager& get_manager() { return this->m; }
+        virtual ast_manager& get_manager() const { return this->m; }
         virtual params_ref& params() { return m_params; }
         virtual void enable_sls(bool force);
         virtual symbol const& maxsat_engine() const { return m_maxsat_engine; }
@@ -283,17 +286,23 @@ namespace opt {
         void display_objective(std::ostream& out, objective const& obj) const;
         void display_bounds(std::ostream& out, bounds_t const& b) const;
 
+        std::string to_string(expr_ref_vector const& hard, vector<objective> const& objectives) const;
+        std::string to_string_internal() const;
+
 
         void validate_lex();
 
         void display_benchmark();
-
 
         // pareto
         void yield();
         expr_ref mk_ge(expr* t, expr* s);
         expr_ref mk_cmp(bool is_ge, model_ref& mdl, objective const& obj);
 
+
+        // quantifiers
+        bool is_qsat_opt();
+        lbool run_qsat_opt();
     };
 
 }

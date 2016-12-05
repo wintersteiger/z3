@@ -136,9 +136,10 @@ if (NOT MSVC)
   set_target_properties(libz3 PROPERTIES OUTPUT_NAME z3)
 endif()
 
-# Using INTERFACE means that targets that try link against libz3 will
-# automatically link against the libs in Z3_DEPENDENT_LIBS
-target_link_libraries(libz3 INTERFACE ${Z3_DEPENDENT_LIBS})
+# The `PRIVATE` usage requirement is specified so that when building Z3 as a
+# shared library the dependent libraries are specified on the link command line
+# so that if those are also shared libraries they are referenced by `libz3.so`.
+target_link_libraries(libz3 PRIVATE ${Z3_DEPENDENT_LIBS})
 
 z3_append_linker_flag_list_to_target(libz3 ${Z3_DEPENDENT_EXTRA_CXX_LINK_FLAGS})
 
@@ -166,7 +167,8 @@ endforeach()
 
 install(TARGETS libz3
   LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-  ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+  ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}" # On Windows this installs ``libz3.lib`` which CMake calls the "corresponding import library". Do we want this installed?
+  RUNTIME DESTINATION "${CMAKE_INSTALL_LIBDIR}" # For Windows. DLLs are runtime targets for CMake
   PUBLIC_HEADER DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
 )
 
@@ -186,7 +188,7 @@ if (MSVC)
       ${Z3_FULL_PATH_API_HEADER_FILES_TO_SCAN}
     DEPENDS
       "${CMAKE_SOURCE_DIR}/scripts/mk_def_file.py"
-      "${CMAKE_SOURCE_DIR}/scripts/mk_util.py"
+      ${Z3_GENERATED_FILE_EXTRA_DEPENDENCIES}
       ${Z3_FULL_PATH_API_HEADER_FILES_TO_SCAN}
     COMMENT "Generating \"${dll_module_exports_file}\""
     ${ADD_CUSTOM_COMMAND_USES_TERMINAL_ARG}
@@ -220,6 +222,30 @@ if (BUILD_PYTHON_BINDINGS)
             "You either need to disable BUILD_PYTHON_BINDINGS or enable BUILD_LIBZ3_SHARED")
   endif()
   add_subdirectory(api/python)
+endif()
+
+################################################################################
+# .NET bindings
+################################################################################
+option(BUILD_DOTNET_BINDINGS "Build .NET bindings for Z3" OFF)
+if (BUILD_DOTNET_BINDINGS)
+  if (NOT BUILD_LIBZ3_SHARED)
+    message(FATAL_ERROR "The .NET bindings will not work with a static libz3. "
+      "You either need to disable BUILD_DOTNET_BINDINGS or enable BUILD_LIBZ3_SHARED")
+  endif()
+  add_subdirectory(api/dotnet)
+endif()
+
+################################################################################
+# Java bindings
+################################################################################
+option(BUILD_JAVA_BINDINGS "Build Java bindings for Z3" OFF)
+if (BUILD_JAVA_BINDINGS)
+  if (NOT BUILD_LIBZ3_SHARED)
+    message(FATAL_ERROR "The Java bindings will not work with a static libz3. "
+      "You either need to disable BUILD_JAVA_BINDINGS or enable BUILD_LIBZ3_SHARED")
+  endif()
+  add_subdirectory(api/java)
 endif()
 
 # TODO: Implement support for other bindigns

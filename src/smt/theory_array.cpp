@@ -75,8 +75,7 @@ namespace smt {
         ast_manager& m = get_manager();
         context& ctx = get_context();
         theory_var r  = theory_array_base::mk_var(n);
-        theory_var r2 = m_find.mk_var();
-        SASSERT(r == r2);
+        VERIFY(r == static_cast<theory_var>(m_find.mk_var()));
         SASSERT(r == static_cast<int>(m_var_data.size()));
         m_var_data.push_back(alloc(var_data));
         var_data * d  = m_var_data[r];
@@ -405,7 +404,7 @@ namespace smt {
                     r = assert_delayed_axioms();
             }
         }
-        TRACE("as_array", tout << "m_found_unsupported_op: " << m_found_unsupported_op << " " << r << "\n";);
+        TRACE("array", tout << "m_found_unsupported_op: " << m_found_unsupported_op << " " << r << "\n";);
         if (r == FC_DONE && m_found_unsupported_op) 
             r = FC_GIVEUP;
         return r;

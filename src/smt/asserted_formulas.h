@@ -55,7 +55,6 @@ class asserted_formulas {
     maximise_bv_sharing         m_bv_sharing;
 
     bool                        m_inconsistent;
-    // qe::expr_quant_elim_star1   m_quant_elim;
 
     struct scope {
         unsigned                m_asserted_formulas_lim;
@@ -84,7 +83,6 @@ class asserted_formulas {
     void eliminate_and();
     void refine_inj_axiom();
     bool cheap_quant_fourier_motzkin();
-    bool quant_elim();
     void apply_distribute_forall();
     bool apply_bit2int();
     void lift_ite();
@@ -115,6 +113,7 @@ public:
     unsigned get_formulas_last_level() const;
     unsigned get_qhead() const { return m_asserted_qhead; }
     void commit(); 
+    void commit(unsigned new_qhead); 
     expr * get_formula(unsigned idx) const { return m_asserted_formulas.get(idx); }
     proof * get_formula_proof(unsigned idx) const { return m_manager.proofs_enabled() ? m_asserted_formula_prs.get(idx) : 0; }
     expr * const * get_formulas() const { return m_asserted_formulas.c_ptr(); }

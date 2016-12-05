@@ -36,7 +36,6 @@ Revision History:
 #include "expr_functors.h"
 #include "quant_hoist.h"
 #include "bool_rewriter.h"
-#include "qe_util.h"
 #include "th_rewriter.h"
 #include "smt_kernel.h"
 #include "model_evaluator.h"
@@ -363,7 +362,7 @@ namespace qe {
             }
             app* ite;
             if (find_ite(fml, ite)) {
-                expr* cond, *th, *el;
+                expr* cond = 0, *th = 0, *el = 0;
                 VERIFY(m.is_ite(ite, cond, th, el));
                 expr_ref tmp1(fml, m), tmp2(fml, m);
                 m_replace->apply_substitution(ite, th, tmp1);
@@ -862,11 +861,12 @@ namespace qe {
 
         void operator()(expr_ref& fml, atom_set& pos, atom_set& neg) {
             expr_ref orig(fml);
-            ast_manager& m = fml.get_manager();
             m_nnf_core(fml);
             m_normalize_literals(fml);
             m_collect_atoms(fml, pos, neg);
-            TRACE("qe", tout << mk_ismt2_pp(orig, m) << "\n-->\n" << mk_ismt2_pp(fml, m) << "\n";);
+            TRACE("qe",
+                  ast_manager& m = fml.get_manager(); 
+                  tout << mk_ismt2_pp(orig, m) << "\n-->\n" << mk_ismt2_pp(fml, m) << "\n";);
         }      
 
         void reset() {
@@ -1900,8 +1900,7 @@ namespace qe {
         // The variable v is to be assigned a value in a range.
         // 
         void constrain_assignment() {
-            expr* fml = m_current->fml();
-            SASSERT(fml);
+            SASSERT(m_current->fml());
             rational k;
             app* x;
             if (!find_min_weight(x, k)) {
@@ -2281,7 +2280,7 @@ namespace qe {
         }    
     }
 
-    static void extract_vars(quantifier* q, expr_ref& new_body, app_ref_vector& vars) {
+    void extract_vars(quantifier* q, expr_ref& new_body, app_ref_vector& vars) {
         ast_manager& m = new_body.get_manager();
         expr_ref tmp(m);
         unsigned nd = q->get_num_decls();

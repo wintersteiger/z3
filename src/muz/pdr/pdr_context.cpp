@@ -45,7 +45,6 @@ Notes:
 #include "smt_value_sort.h"
 #include "proof_utils.h"
 #include "dl_boogie_proof.h"
-#include "qe_util.h"
 #include "scoped_proof.h"
 #include "blast_term_ite_tactic.h"
 #include "model_implicant.h"
@@ -275,7 +274,7 @@ namespace pdr {
 
         for (unsigned i = 0; i < src.size(); ) {
             expr * curr = src[i].get();
-            unsigned stored_lvl;
+            unsigned stored_lvl = 0;
             VERIFY(m_prop2level.find(curr, stored_lvl));
             SASSERT(stored_lvl >= src_level);
             bool assumes_level;
@@ -585,6 +584,7 @@ namespace pdr {
         init_atom(pts, rule.get_head(), var_reprs, conj, UINT_MAX);
         for (unsigned i = 0; i < ut_size; ++i) {
             if (rule.is_neg_tail(i)) {
+                dealloc(&var_reprs);
                 throw default_exception("PDR does not support negated predicates in rule tails");
             }
             init_atom(pts, rule.get_tail(i), var_reprs, conj, i);
@@ -603,7 +603,13 @@ namespace pdr {
             var_subst(m, false)(tail[i].get(), var_reprs.size(), (expr*const*)var_reprs.c_ptr(), tmp);
             conj.push_back(tmp);
             TRACE("pdr", tout << mk_pp(tail[i].get(), m) << "\n" << mk_pp(tmp, m) << "\n";);
-            SASSERT(is_ground(tmp));
+            if (!is_ground(tmp)) {
+                std::stringstream msg;
+                msg << "PDR cannot solve non-ground tails: " << tmp;
+                IF_VERBOSE(0, verbose_stream() << msg.str() << "\n";);
+                dealloc(&var_reprs);
+                throw default_exception(msg.str());
+            }
         }
         expr_ref fml = pm.mk_and(conj);
         th_rewriter rw(m);
@@ -889,14 +895,16 @@ namespace pdr {
 
 
     void model_node::dequeue(model_node*& root) {
-        TRACE("pdr", tout << this << " " << state() << "\n";);
+        TRACE("pdr", tout << this << " root: " << root << " " << state() << "\n";);
         if (!m_next && !m_prev) return;
         SASSERT(m_next);
         SASSERT(m_prev);
         SASSERT(children().empty());
         if (this == m_next) {
-            SASSERT(root == this);
-            root = 0;
+            SASSERT(m_prev == this);
+            if (root == this) {
+                root = 0;
+            }
         }
         else {
             m_next->m_prev = m_prev;
@@ -968,7 +976,7 @@ namespace pdr {
     }
 
     void model_search::enqueue_leaf(model_node* n) {
-        TRACE("pdr_verbose", tout << n << " " << n->state() << " goal: " << m_goal << "\n";);
+        TRACE("pdr_verbose", tout << "node: " << n << " " << n->state() << " goal: " << m_goal << "\n";);
         SASSERT(n->is_open());
         if (!m_goal) {
             m_goal = n;
@@ -998,7 +1006,7 @@ namespace pdr {
         return m_cache[l];
     }
 
-    void model_search::erase_children(model_node& n, bool backtrack) {
+    void model_search::erase_children(model_node& n, bool backtrack) {        
         ptr_vector<model_node> todo, nodes;
         todo.append(n.children());
         remove_goal(n);
@@ -1760,6 +1768,7 @@ namespace pdr {
                 smt::kernel solver(m, get_fparams());
                 solver.assert_expr(tmp);
                 lbool res = solver.check();
+                TRACE("pdr", tout << tmp << " " << res << "\n";);
                 if (res != l_false) {
                     msg << "rule validation failed when checking: " << mk_pp(tmp, m);
                     IF_VERBOSE(0, verbose_stream() << msg.str() << "\n";);
@@ -1817,6 +1826,10 @@ namespace pdr {
                     IF_VERBOSE(1, verbose_stream() << "UTVPI\n";);
                     m_fparams.m_arith_mode = AS_UTVPI;
                     m_fparams.m_arith_expand_eqs = true;
+                }
+                else {
+                    m_fparams.m_arith_mode = AS_ARITH;
+                    m_fparams.m_arith_expand_eqs = false;
                 }
             }
         }

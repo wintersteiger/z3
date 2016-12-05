@@ -53,7 +53,16 @@ public:
 
     //void display(std::ostream & out);
 
-    virtual model_converter * translate(ast_translation & translator) {NOT_IMPLEMENTED_YET();}
+    virtual model_converter * translate(ast_translation & translator) {
+        ackr_info_ref retv_info = info->translate(translator);
+        if (fixed_model) {
+            model_ref retv_mod_ref = abstr_model->translate(translator);
+            return alloc(ackr_model_converter, translator.to(), retv_info, retv_mod_ref);
+        }
+        else {
+            return alloc(ackr_model_converter, translator.to(), retv_info);
+        }
+    }
 protected:
     ast_manager&              m;
     const ackr_info_ref       info;
@@ -63,19 +72,13 @@ protected:
     void add_entry(model_evaluator & evaluator,
         app* term, expr* value,
         obj_map<func_decl, func_interp*>& interpretations);
-    void convert_sorts(model * source, model * destination);
     void convert_constants(model * source, model * destination);
 };
 
 void ackr_model_converter::convert(model * source, model * destination) {
-    //SASSERT(source->get_num_functions() == 0);
-    for (unsigned i = 0; i < source->get_num_functions(); i++) {
-        func_decl * const fd = source->get_function(i);
-        func_interp * const fi = source->get_func_interp(fd);
-        destination->register_decl(fd, fi);
-    }
+    destination->copy_func_interps(*source);
+    destination->copy_usort_interps(*source);
     convert_constants(source,destination);
-    convert_sorts(source,destination);
 }
 
 void ackr_model_converter::convert_constants(model * source, model * destination) {
@@ -133,14 +136,6 @@ void ackr_model_converter::add_entry(model_evaluator & evaluator,
         fi->insert_new_entry(args.c_ptr(), value);
     } else {
         TRACE("ackr_model", tout << "entry already present\n";);
-    }
-}
-
-void ackr_model_converter::convert_sorts(model * source, model * destination) {
-    for (unsigned i = 0; i < source->get_num_uninterpreted_sorts(); i++) {
-        sort * const s = source->get_uninterpreted_sort(i);
-        ptr_vector<expr> u = source->get_universe(s);
-        destination->register_usort(s, u.size(), u.c_ptr());
     }
 }
 

@@ -265,13 +265,24 @@ The following useful options can be passed to CMake whilst configuring.
 * ``CMAKE_INSTALL_INCLUDEDIR`` - STRING. The path to install z3 include files (relative to ``CMAKE_INSTALL_PREFIX``), e.g. ``include``.
 * ``CMAKE_INSTALL_LIBDIR`` - STRING. The path to install z3 libraries (relative to ``CMAKE_INSTALL_PREFIX``), e.g. ``lib``.
 * ``CMAKE_INSTALL_PREFIX`` - STRING. The install prefix to use (e.g. ``/usr/local/``).
-* ``ENABLE_TRACING`` - BOOL. If set to ``TRUE`` enable tracing, if set to ``FALSE`` disable tracing.
+* ``CMAKE_INSTALL_PKGCONFIGDIR`` - STRING. The path to install pkgconfig files.
+* ``CMAKE_INSTALL_PYTHON_PKG_DIR`` - STRING. The path to install the z3 python bindings. This can be relative (to ``CMAKE_INSTALL_PREFIX``) or absolute.
+* ``ENABLE_TRACING_FOR_NON_DEBUG`` - BOOL. If set to ``TRUE`` enable tracing in non-debug builds, if set to ``FALSE`` disable tracing in non-debug builds. Note in debug builds tracing is always enabled.
 * ``BUILD_LIBZ3_SHARED`` - BOOL. If set to ``TRUE`` build libz3 as a shared library otherwise build as a static library.
 * ``ENABLE_EXAMPLE_TARGETS`` - BOOL. If set to ``TRUE`` add the build targets for building the API examples.
 * ``USE_OPENMP`` - BOOL. If set to ``TRUE`` and OpenMP support is detected build with OpenMP support.
 * ``USE_LIB_GMP`` - BOOL. If set to ``TRUE`` use the GNU multiple precision library. If set to ``FALSE`` use an internal implementation.
+* ``PYTHON_EXECUTABLE`` - STRING. The python executable to use during the build.
 * ``BUILD_PYTHON_BINDINGS`` - BOOL. If set to ``TRUE`` then Z3's python bindings will be built.
 * ``INSTALL_PYTHON_BINDINGS`` - BOOL. If set to ``TRUE`` and ``BUILD_PYTHON_BINDINGS`` is ``TRUE`` then running the ``install`` target will install Z3's Python bindings.
+* ``BUILD_DOTNET_BINDINGS`` - BOOL. If set to ``TRUE`` then Z3's .NET bindings will be built.
+* ``INSTALL_DOTNET_BINDINGS`` - BOOL. If set to ``TRUE`` and ``BUILD_DOTNET_BINDINGS`` is ``TRUE`` then running the ``install`` target will install Z3's .NET bindings.
+* ``DOTNET_CSC_EXECUTABLE`` - STRING. The path to the C# compiler to use. Only relevant if ``BUILD_DOTNET_BINDINGS`` is set to ``TRUE``.
+* ``DOTNET_GACUTIL_EXECUTABLE`` - STRING. The path to the gacutil program to use. Only relevant if ``BUILD_DOTNET_BINDINGS`` is set to ``TRUE``.
+* ``BUILD_JAVA_BINDINGS`` - BOOL. If set to ``TRUE`` then Z3's Java bindings will be built.
+* ``INSTALL_JAVA_BINDINGS`` - BOOL. If set to ``TRUE`` and ``BUILD_JAVA_BINDINGS`` is ``TRUE`` then running the ``install`` target will install Z3's Java bindings.
+* ``Z3_JAVA_JAR_INSTALLDIR`` - STRING. The path to directory to install the Z3 Java ``.jar`` file. This path should be relative to ``CMAKE_INSTALL_PREFIX``.
+* ``Z3_JAVA_JNI_LIB_INSTALLDIRR`` - STRING. The path to directory to install the Z3 Java JNI bridge library. This path should be relative to ``CMAKE_INSTALL_PREFIX``.
 
 On the command line these can be passed to ``cmake`` using the ``-D`` option. In ``ccmake`` and ``cmake-gui`` these can be set in the user interface.
 
@@ -279,7 +290,28 @@ Example
 
 ```
 cmake -DCMAKE_BUILD_TYPE=Release -DENABLE_TRACING=FALSE ../
+
 ```
+
+## Z3 API Bindings
+
+Z3 exposes various language bindings for its API. Below are some notes on building
+and/or installing these bindings when building Z3 with CMake.
+
+### Java bindings
+
+The CMake build uses the ``FindJava`` and ``FindJNI`` cmake modules to detect the
+installation of Java. If CMake fails to find your installation of Java set the
+``JAVA_HOME`` environment variable when invoking CMake so that it points at the
+correct location. For example
+
+```
+JAVA_HOME=/usr/lib/jvm/default cmake -DBUILD_JAVA_BINDINGS=ON ../
+```
+Note that the built ``.jar`` file is named ``com.microsoft.z3-VERSION.jar``
+where ``VERSION`` is the Z3 version. Under non Windows systems a
+symbolic link named ``com.microsoft.z3.jar`` is provided. This symbolic
+link is not created when building under Windows.
 
 ## Developer/packager notes
 

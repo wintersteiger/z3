@@ -69,6 +69,12 @@ COMPILE_TIME_ASSERT(sizeof(int64) == 8);
 #define THREAD_LOCAL 
 #endif
 
+#ifdef _MSC_VER
+# define STD_CALL __cdecl
+#else
+# define STD_CALL
+#endif
+
 #ifdef __fallthrough
 # define Z3_fallthrough __fallthrough
 #elif defined(__has_cpp_attribute)
@@ -220,9 +226,7 @@ public:
     }
 
     ~scoped_ptr() {
-        if (m_ptr) {
-            dealloc(m_ptr);
-        }
+        dealloc(m_ptr);
     }
 
     T * operator->() const { 
@@ -247,9 +251,7 @@ public:
 
     scoped_ptr & operator=(T * n) {
         if (m_ptr != n) {
-            if (m_ptr) {
-                dealloc(m_ptr);
-            }
+            dealloc(m_ptr);
             m_ptr = n;
         }
         return *this;

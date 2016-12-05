@@ -32,9 +32,10 @@ project(Z3 C CXX)
 # Project version
 ################################################################################
 set(Z3_VERSION_MAJOR 4)
-set(Z3_VERSION_MINOR 4)
-set(Z3_VERSION_PATCH 2)
+set(Z3_VERSION_MINOR 5)
+set(Z3_VERSION_PATCH 1)
 set(Z3_VERSION_TWEAK 0)
+set(Z3_FULL_VERSION 0)
 set(Z3_VERSION "${Z3_VERSION_MAJOR}.${Z3_VERSION_MINOR}.${Z3_VERSION_PATCH}.${Z3_VERSION_TWEAK}")
 message(STATUS "Z3 version ${Z3_VERSION}")
 
@@ -246,7 +247,7 @@ endif()
 # FP math
 ################################################################################
 # FIXME: Support ARM "-mfpu=vfp -mfloat-abi=hard"
-if ("${TARGET_ARCHITECTURE}" STREQUAL "x86_64")
+if (("${TARGET_ARCHITECTURE}" STREQUAL "x86_64") OR ("${TARGET_ARCHITECTURE}" STREQUAL "i686"))
   if (("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU") OR ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang"))
     set(SSE_FLAGS "-mfpmath=sse" "-msse" "-msse2")
     # FIXME: Remove "x.." when CMP0054 is set to NEW
@@ -289,21 +290,25 @@ endif()
 ################################################################################
 # Tracing
 ################################################################################
-option(ENABLE_TRACING OFF "Enable tracing")
-if (ENABLE_TRACING)
+option(ENABLE_TRACING_FOR_NON_DEBUG "Enable tracing in non-debug builds." OFF)
+if (ENABLE_TRACING_FOR_NON_DEBUG)
   list(APPEND Z3_COMPONENT_CXX_DEFINES "-D_TRACE")
+else()
+  # Tracing is always enabled in debug builds
+  list(APPEND Z3_COMPONENT_CXX_DEFINES $<$<CONFIG:Debug>:_TRACE>)
 endif()
-# Should we always enable tracing when doing a debug build?
-#list(APPEND Z3_COMPONENT_CXX_DEFINES $<$<CONFIG:Debug>:_TRACE>)
 
 ################################################################################
-# Postion indepdent code
+# Postion independent code
 ################################################################################
 # This is required because code built in the components will end up in a shared
 # library. If not building a shared library ``-fPIC`` isn't needed and would add
 # unnecessary overhead.
 if (BUILD_LIBZ3_SHARED)
-  if (NOT MSVC)
+  # Avoid adding -fPIC compiler switch if we compile with MSVC (which does not
+  # support the flag) or if we target Windows, which generally does not use
+  # position independent code for native code shared libraries (DLLs).
+  if (NOT (MSVC OR MINGW OR WIN32))
     z3_add_cxx_flag("-fPIC" REQUIRED)
   endif()
 endif()
@@ -322,9 +327,35 @@ message(STATUS "Z3_DEPENDENT_EXTRA_C_LINK_FLAGS: ${Z3_DEPENDENT_EXTRA_C_LINK_FLA
 # Z3 installation locations
 ################################################################################
 include(GNUInstallDirs)
+set(CMAKE_INSTALL_PKGCONFIGDIR
+  "${CMAKE_INSTALL_LIBDIR}/pkgconfig"
+  CACHE
+  PATH
+  "Directory to install pkgconfig files"
+)
 message(STATUS "CMAKE_INSTALL_LIBDIR: \"${CMAKE_INSTALL_LIBDIR}\"")
 message(STATUS "CMAKE_INSTALL_BINDIR: \"${CMAKE_INSTALL_BINDIR}\"")
 message(STATUS "CMAKE_INSTALL_INCLUDEDIR: \"${CMAKE_INSTALL_INCLUDEDIR}\"")
+message(STATUS "CMAKE_INSTALL_PKGCONFIGDIR: \"${CMAKE_INSTALL_PKGCONFIGDIR}\"")
+
+################################################################################
+# Uninstall rule
+################################################################################
+configure_file(
+  "${CMAKE_SOURCE_DIR}/cmake/cmake_uninstall.cmake.in"
+  "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake"
+  @ONLY
+)
+
+# Target needs to be declared before the components so that they can add
+# dependencies to this target so they can run their own custom uninstall rules.
+add_custom_target(uninstall
+  COMMAND
+  "${CMAKE_COMMAND}" -P "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake"
+  COMMENT "Uninstalling..."
+  ${ADD_CUSTOM_COMMAND_USES_TERMINAL_ARG}
+  VERBATIM
+)
 
 ################################################################################
 # CMake build file locations
@@ -334,6 +365,17 @@ message(STATUS "CMAKE_INSTALL_INCLUDEDIR: \"${CMAKE_INSTALL_INCLUDEDIR}\"")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
+
+################################################################################
+# Extra dependencies for build rules that use the Python infrastructure to
+# generate files used for Z3's build. Changes to these files will trigger
+# a rebuild of all the generated files.
+################################################################################
+# Note: ``update_api.py`` is deliberately not here because it not used
+# to generate every generated file. The targets that need it list it explicitly.
+set(Z3_GENERATED_FILE_EXTRA_DEPENDENCIES
+  "${CMAKE_SOURCE_DIR}/scripts/mk_genfile_common.py"
+)
 
 ################################################################################
 # Z3 components, library and executables
@@ -349,20 +391,3 @@ option(ENABLE_EXAMPLE_TARGETS "Build Z3 api examples" ON)
 if (ENABLE_EXAMPLE_TARGETS)
   add_subdirectory(examples)
 endif()
-
-################################################################################
-# Uninstall rule
-################################################################################
-configure_file(
-  "${CMAKE_SOURCE_DIR}/cmake/cmake_uninstall.cmake.in"
-  "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake"
-  @ONLY
-)
-
-add_custom_target(uninstall
-  COMMAND
-  "${CMAKE_COMMAND}" -P "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake"
-  COMMENT "Uninstalling..."
-  ${ADD_CUSTOM_COMMAND_USES_TERMINAL_ARG}
-  VERBATIM
-)

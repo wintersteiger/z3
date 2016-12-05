@@ -63,6 +63,7 @@ void simplifier::operator()(expr * s, expr_ref & r, proof_ref & p) {
     m_need_reset = true;
     reinitialize();
     expr  * s_orig = s;
+    (void)s_orig;
     expr  * old_s;
     expr  * result;
     proof * result_proof;
@@ -473,6 +474,7 @@ void simplifier::mk_app(func_decl * decl, unsigned num_args, expr * const * args
         //dump_rewrite_lemma(decl, num_args, args, result.get());
         return;
     }
+	
     result = m.mk_app(decl, num_args, args);
 }
 
