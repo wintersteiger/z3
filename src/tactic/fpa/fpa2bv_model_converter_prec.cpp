@@ -186,8 +186,8 @@ void fpa2bv_model_converter_prec::convert(model * bv_mdl, model * float_mdl) {
 
     obj_hashtable<func_decl> seen;
 
-    for (obj_map<func_decl, std::pair<app*, app*> >::iterator it = m_specials.begin();
-         it != m_specials.end();
+    for (obj_map<func_decl, std::pair<app*, app*> >::iterator it = m_min_max_specials.begin();
+         it != m_min_max_specials.end();
          it++) {
         func_decl * f = it->m_key;
         expr_ref pzero(m), nzero(m);

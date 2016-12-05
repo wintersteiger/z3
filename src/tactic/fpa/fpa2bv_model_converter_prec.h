@@ -27,7 +27,7 @@ class fpa2bv_model_converter_prec : public model_converter {
     obj_map<func_decl, expr*>   m_const2bv;
     obj_map<func_decl, expr*>   m_rm_const2bv;
     obj_map<func_decl, func_decl*>  m_uf2bvuf;
-    obj_map<func_decl, std::pair<app *, app *> > m_specials;
+    obj_map<func_decl, std::pair<app *, app *> > m_min_max_specials;
 
 public:
     fpa2bv_model_converter_prec(ast_manager & m, fpa2bv_converter_prec const & conv) : m(m) {
@@ -55,10 +55,10 @@ public:
             m.inc_ref(it->m_key);
             m.inc_ref(it->m_value);
         }
-        for (obj_map<func_decl, std::pair<app*, app*> >::iterator it = conv.m_specials.begin();
-             it != conv.m_specials.end();
+        for (obj_map<func_decl, std::pair<app*, app*> >::iterator it = conv.m_min_max_specials.begin();
+             it != conv.m_min_max_specials.end();
              it++) {
-            m_specials.insert(it->m_key, it->m_value);
+            m_min_max_specials.insert(it->m_key, it->m_value);
             m.inc_ref(it->m_key);
             m.inc_ref(it->m_value.first);
             m.inc_ref(it->m_value.second);
@@ -69,8 +69,8 @@ public:
         dec_ref_map_key_values(m, m_const2bv);
         dec_ref_map_key_values(m, m_rm_const2bv);
         dec_ref_map_key_values(m, m_uf2bvuf);
-        for (obj_map<func_decl, std::pair<app*, app*> >::iterator it = m_specials.begin();
-             it != m_specials.end();
+        for (obj_map<func_decl, std::pair<app*, app*> >::iterator it = m_min_max_specials.begin();
+             it != m_min_max_specials.end();
              it++) {
             m.dec_ref(it->m_key);
             m.dec_ref(it->m_value.first);
