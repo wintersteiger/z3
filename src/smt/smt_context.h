@@ -1569,7 +1569,6 @@ namespace smt {
         quantifier * get_macro_quantifier(func_decl * f) const { return m_asserted_formulas.get_macro_quantifier(f); }
         void insert_macro(func_decl * f, quantifier * m, proof * pr) { m_asserted_formulas.insert_macro(f, m, pr); }
     };
-
 };
 
 #endif /* SMT_CONTEXT_H_ */

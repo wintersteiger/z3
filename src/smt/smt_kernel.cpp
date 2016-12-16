@@ -8,7 +8,7 @@ Module Name:
 Abstract:
 
     New frontend for smt::context.
-    
+
 Author:
 
     Leonardo de Moura (leonardo) 2012-02-09.
@@ -17,7 +17,7 @@ Revision History:
 
 --*/
 #include"smt_kernel.h"
-#include"smt_context.h" 
+#include"smt_context.h"
 #include"ast_smt2_pp.h"
 #include"smt_params_helper.hpp"
 
@@ -26,7 +26,7 @@ namespace smt {
     struct kernel::imp {
         smt::context m_kernel;
         params_ref   m_params;
-        
+
         imp(ast_manager & m, smt_params & fp, params_ref const & p):
             m_kernel(m, fp, p),
             m_params(p) {
@@ -43,7 +43,7 @@ namespace smt {
         params_ref const & params() {
             return m_params;
         }
-     
+
         ast_manager & m() const {
             return m_kernel.get_manager();
         }
@@ -51,7 +51,7 @@ namespace smt {
         bool set_logic(symbol logic) {
             return m_kernel.set_logic(logic);
         }
-        
+
         void set_progress_callback(progress_callback * callback) {
             return m_kernel.set_progress_callback(callback);
         }
@@ -67,12 +67,12 @@ namespace smt {
             }
             out << ")";
         }
-        
+
         void assert_expr(expr * e) {
             TRACE("smt_kernel", tout << "assert:\n" << mk_ismt2_pp(e, m()) << "\n";);
             m_kernel.assert_expr(e);
         }
-        
+
         void assert_expr(expr * e, proof * pr) {
             m_kernel.assert_expr(e, pr);
         }
@@ -80,11 +80,11 @@ namespace smt {
         unsigned size() const {
             return m_kernel.get_num_asserted_formulas();
         }
-        
+
         expr * const * get_formulas() const {
             return m_kernel.get_asserted_formulas();
         }
-        
+
         void push() {
             TRACE("smt_kernel", tout << "push()\n";);
             m_kernel.push();
@@ -94,7 +94,7 @@ namespace smt {
             TRACE("smt_kernel", tout << "pop()\n";);
             m_kernel.pop(num_scopes);
         }
-        
+
         unsigned get_scope_level() const {
             return m_kernel.get_scope_level();
         }
@@ -106,7 +106,7 @@ namespace smt {
         bool inconsistent() {
             return m_kernel.inconsistent();
         }
-        
+
         lbool check(unsigned num_assumptions, expr * const * assumptions) {
             return m_kernel.check(num_assumptions, assumptions);
         }
@@ -123,7 +123,7 @@ namespace smt {
         lbool find_mutexes(expr_ref_vector const& vars, vector<expr_ref_vector>& mutexes) {
             return m_kernel.find_mutexes(vars, mutexes);
         }
-        
+
         void get_model(model_ref & m) const {
             m_kernel.get_model(m);
         }
@@ -135,15 +135,15 @@ namespace smt {
         unsigned get_unsat_core_size() const {
             return m_kernel.get_unsat_core_size();
         }
-        
+
         expr * get_unsat_core_expr(unsigned idx) const {
             return m_kernel.get_unsat_core_expr(idx);
         }
-        
+
         failure last_failure() const {
             return m_kernel.get_last_search_failure();
         }
-        
+
         std::string last_failure_as_string() const {
             return m_kernel.last_failure_as_string();
         }
@@ -155,11 +155,11 @@ namespace smt {
         void get_assignments(expr_ref_vector & result) {
             m_kernel.get_assignments(result);
         }
-        
+
         void get_relevant_labels(expr * cnstr, buffer<symbol> & result) {
             m_kernel.get_relevant_labels(cnstr, result);
         }
-        
+
         void get_relevant_labeled_literals(bool at_lbls, expr_ref_vector & result) {
             m_kernel.get_relevant_labeled_literals(at_lbls, result);
         }
@@ -167,26 +167,26 @@ namespace smt {
         void get_relevant_literals(expr_ref_vector & result) {
             m_kernel.get_relevant_literals(result);
         }
-        
+
         void get_guessed_literals(expr_ref_vector & result) {
             m_kernel.get_guessed_literals(result);
         }
-        
+
         void collect_statistics(::statistics & st) const {
             m_kernel.collect_statistics(st);
         }
-        
+
         void reset_statistics() {
         }
 
         void display_statistics(std::ostream & out) const {
             m_kernel.display_statistics(out);
         }
-        
+
         void display_istatistics(std::ostream & out) const {
             m_kernel.display_istatistics(out);
         }
-        
+
         bool canceled() {
             return m_kernel.get_cancel_flag();
         }
@@ -240,7 +240,7 @@ namespace smt {
     unsigned kernel::size() const {
         return m_imp->size();
     }
-    
+
     expr * const * kernel::get_formulas() const {
         return m_imp->get_formulas();
     }
@@ -306,7 +306,7 @@ namespace smt {
     unsigned kernel::get_unsat_core_size() const {
         return m_imp->get_unsat_core_size();
     }
-        
+
     expr * kernel::get_unsat_core_expr(unsigned idx) const {
         return m_imp->get_unsat_core_expr(idx);
     }
@@ -326,11 +326,11 @@ namespace smt {
     void kernel::get_assignments(expr_ref_vector & result) {
         m_imp->get_assignments(result);
     }
-        
+
     void kernel::get_relevant_labels(expr * cnstr, buffer<symbol> & result) {
         m_imp->get_relevant_labels(cnstr, result);
     }
-    
+
     void kernel::get_relevant_labeled_literals(bool at_lbls, expr_ref_vector & result) {
         m_imp->get_relevant_labeled_literals(at_lbls, result);
     }
@@ -350,7 +350,7 @@ namespace smt {
     void kernel::collect_statistics(::statistics & st) const {
         m_imp->collect_statistics(st);
     }
-        
+
     void kernel::reset_statistics() {
         m_imp->reset_statistics();
     }

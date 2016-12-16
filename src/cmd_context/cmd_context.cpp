@@ -508,7 +508,6 @@ void cmd_context::load_plugin(symbol const & name, bool install, svector<family_
     fids.erase(id);
 }
 
-
 bool cmd_context::logic_has_arith() const {
     return !has_logic() || smt_logics::logic_has_arith(m_logic);
 }
@@ -748,11 +747,11 @@ void cmd_context::insert_rec_fun(func_decl* f, expr_ref_vector const& binding, s
     }
 
     //
-    // disable warning given the current way they are used 
-    // (Z3 will here silently assume and not check the definitions to be well founded, 
+    // disable warning given the current way they are used
+    // (Z3 will here silently assume and not check the definitions to be well founded,
     // and please use HSF for everything else).
     //
-    if (false && !ids.empty() && !m_rec_fun_declared) {        
+    if (false && !ids.empty() && !m_rec_fun_declared) {
         warning_msg("recursive function definitions are assumed well-founded");
         m_rec_fun_declared = true;
     }
@@ -1454,7 +1453,7 @@ void cmd_context::reset_assertions() {
         if (m_solver) m_solver->push();
     }
 }
-    
+
 
 void cmd_context::display_model(model_ref& mdl) {
     if (mdl) {

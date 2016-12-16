@@ -10,7 +10,7 @@ Abstract:
     New frontend for smt::context.
     The "kernel" tries to hide details of the smt::context object.
     From now on, clients (code outside of the smt module) should be use smt::kernel instead of smt::context.
-    
+
 Author:
 
     Leonardo de Moura (leonardo) 2012-02-09.
@@ -41,7 +41,7 @@ namespace smt {
 
     class enode;
     class context;
-    
+
     class kernel {
         struct imp;
         imp *  m_imp;
@@ -53,7 +53,7 @@ namespace smt {
         static void copy(kernel& src, kernel& dst);
 
         ast_manager & m() const;
-        
+
         /**
            \brief Set logic. It must be invoked before any assertions.
            Return true if succeeded.
@@ -81,12 +81,12 @@ namespace smt {
            \brief Return the number of asserted formulas in the kernel.
         */
         unsigned size() const;
-        
+
         /**
            \brief Return the array of asserted formulas.
         */
         expr * const * get_formulas() const;
-        
+
         /**
            \brief Create a backtracking point (aka scope level).
         */
@@ -117,7 +117,7 @@ namespace smt {
            \brief Setup the logical context and invoke check.
         */
         lbool setup_and_check();
-        
+
         /**
            \brief Satisfiability check.
         */
@@ -130,7 +130,7 @@ namespace smt {
         /**
            \brief extract consequences among variables.
         */
-        lbool get_consequences(expr_ref_vector const& assumptions, expr_ref_vector const& vars, 
+        lbool get_consequences(expr_ref_vector const& assumptions, expr_ref_vector const& vars,
                                expr_ref_vector& conseq, expr_ref_vector& unfixed);
 
         /**
@@ -139,7 +139,7 @@ namespace smt {
         lbool find_mutexes(expr_ref_vector const& vars, vector<expr_ref_vector>& mutexes);
 
         /**
-           \brief Preferential SAT. 
+           \brief Preferential SAT.
         */
         lbool preferred_sat(expr_ref_vector const& asms, vector<expr_ref_vector>& cores);
 
@@ -157,7 +157,7 @@ namespace smt {
            \brief Return the size of the unsat core associated with the last check command.
         */
         unsigned get_unsat_core_size() const;
-        
+
         /**
            \brief Return the i-th expression in the unsat core associated with the last check command.
 
@@ -186,7 +186,7 @@ namespace smt {
            \brief Return the set of formulas assigned by the kernel.
         */
         void get_assignments(expr_ref_vector & result);
-        
+
         /**
            \brief Return the set of relevant labels in the last check command.
         */
@@ -216,7 +216,7 @@ namespace smt {
            \brief Collect runtime statistics.
          */
         void collect_statistics(::statistics & st) const;
-        
+
         /**
            \brief Reset kernel statistics.
         */
@@ -231,12 +231,12 @@ namespace smt {
            \brief Display statistics in low level format.
         */
         void display_istatistics(std::ostream & out) const;
-                
+
         /**
            \brief Return true if the kernel was interrupted.
         */
         bool canceled() const;
-        
+
         /**
            \brief Update configuration parameters.
         */

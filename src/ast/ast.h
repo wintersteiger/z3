@@ -1530,6 +1530,9 @@ public:
 
     decl_plugin * get_plugin(family_id fid) const;
 
+    decl_plugin * const * begin_plugins() const { return m_plugins.begin(); }
+    decl_plugin * const * end_plugins() const { return m_plugins.end(); }
+
     bool has_plugin(family_id fid) const { return get_plugin(fid) != 0; }
 
     bool has_plugin(symbol const & s) const { return m_family_manager.has_family(s) && has_plugin(m_family_manager.get_family_id(s)); }
@@ -1567,10 +1570,13 @@ public:
     bool contains(ast * a) const { return m_ast_table.contains(a); }
 
     bool is_rec_fun_def(quantifier* q) const { return q->get_qid() == m_rec_fun; }
-    
+
     symbol const& rec_fun_qid() const { return m_rec_fun; }
 
     unsigned get_num_asts() const { return m_ast_table.size(); }
+
+    ast_table::iterator begin_asts() const { return m_ast_table.begin(); }
+    ast_table::iterator end_asts() const { return m_ast_table.end(); }
 
     void debug_ref_count() { m_debug_ref_count = true; }
 
@@ -1579,7 +1585,7 @@ public:
             n->inc_ref();
         }
     }
-    
+
     void dec_ref(ast* n) {
         if (n) {
             n->dec_ref();

@@ -41,7 +41,7 @@ namespace smt {
         scoped_ptr<quantifier_manager_plugin>  m_plugin;
         unsigned                               m_num_instances;
 
-        imp(quantifier_manager & wrapper, context & ctx, smt_params & p, quantifier_manager_plugin * plugin):
+        imp(quantifier_manager & wrapper, context & ctx, smt_params & p, quantifier_manager_plugin * plugin) :
             m_wrapper(wrapper),
             m_context(ctx),
             m_params(p),
@@ -65,17 +65,29 @@ namespace smt {
         }
 
         void add(quantifier * q, unsigned generation) {
+            TRACE("add_quantifier", tout << "New quantifier '" << q->get_qid() << "' (gen " << generation << "): " << mk_ismt2_pp(q, m_context.get_manager()) << std::endl;);
             quantifier_stat * stat = m_qstat_gen(q, generation);
             m_quantifier_stat.insert(q, stat);
             m_quantifiers.push_back(q);
             m_plugin->add(q);
         }
 
+        bool find(symbol const & qid, quantifier * & q) const {
+            ptr_vector<quantifier>::const_iterator it = m_quantifiers.begin();
+            ptr_vector<quantifier>::const_iterator end = m_quantifiers.end();
+            for (; it != end; it++)
+                if ((*it)->get_qid() == qid) {
+                    q = *it;
+                    return true;
+                }
+            return false;
+        }
+
         void display_stats(std::ostream & out, quantifier * q) {
-            quantifier_stat * s     = get_stat(q);
-            unsigned num_instances  = s->get_num_instances();
+            quantifier_stat * s = get_stat(q);
+            unsigned num_instances = s->get_num_instances();
             unsigned max_generation = s->get_max_generation();
-            float max_cost          = s->get_max_cost();
+            float max_cost = s->get_max_cost();
             if (num_instances > 0) {
                 out << "[quantifier_instances] ";
                 out.width(10);
@@ -104,12 +116,12 @@ namespace smt {
         }
 
         bool add_instance(quantifier * q, app * pat,
-                          unsigned num_bindings,
-                          enode * const * bindings,
-                          unsigned max_generation,
-                          unsigned min_top_generation,
-                          unsigned max_top_generation,
-                          ptr_vector<enode> & used_enodes) {
+            unsigned num_bindings,
+            enode * const * bindings,
+            unsigned max_generation,
+            unsigned min_top_generation,
+            unsigned max_top_generation,
+            ptr_vector<enode> & used_enodes) {
             max_generation = std::max(max_generation, get_generation(q));
             if (m_num_instances > m_params.m_qi_max_instances) {
                 return false;
@@ -126,7 +138,7 @@ namespace smt {
                         out << " #" << bindings[i]->get_owner_id();
                     }
                     out << " ;";
-                    ptr_vector<enode>::const_iterator it  = used_enodes.begin();
+                    ptr_vector<enode>::const_iterator it = used_enodes.begin();
                     ptr_vector<enode>::const_iterator end = used_enodes.end();
                     for (; it != end; ++it)
                         out << " #" << (*it)->get_owner_id();
@@ -149,7 +161,7 @@ namespace smt {
 
         void init_search_eh() {
             m_num_instances = 0;
-            ptr_vector<quantifier>::iterator it2  = m_quantifiers.begin();
+            ptr_vector<quantifier>::iterator it2 = m_quantifiers.begin();
             ptr_vector<quantifier>::iterator end2 = m_quantifiers.end();
             for (; it2 != end2; ++it2) {
                 quantifier * q = *it2;
@@ -207,7 +219,7 @@ namespace smt {
             IF_VERBOSE(10, verbose_stream() << "quick checking quantifiers (unsat)...\n";);
             quick_checker mc(m_context);
             bool result = true;
-            ptr_vector<quantifier>::const_iterator it  = m_quantifiers.begin();
+            ptr_vector<quantifier>::const_iterator it = m_quantifiers.begin();
             ptr_vector<quantifier>::const_iterator end = m_quantifiers.end();
             for (; it != end; ++it)
                 if (check_quantifier(*it) && mc.instantiate_unsat(*it))
@@ -219,7 +231,7 @@ namespace smt {
             // MC_NO_SAT is too expensive (it creates too many irrelevant instances).
             // we should use MBQI=true instead.
             IF_VERBOSE(10, verbose_stream() << "quick checking quantifiers (not sat)...\n";);
-            it  = m_quantifiers.begin();
+            it = m_quantifiers.begin();
             for (; it != end; ++it)
                 if (check_quantifier(*it) && mc.instantiate_not_sat(*it))
                     result = false;
@@ -230,7 +242,7 @@ namespace smt {
         final_check_status final_check_eh(bool full) {
             if (full) {
                 IF_VERBOSE(100, verbose_stream() << "(smt.final-check \"quantifiers\")\n";);
-                final_check_status result  = m_qi_queue.final_check_eh() ? FC_DONE : FC_CONTINUE;
+                final_check_status result = m_qi_queue.final_check_eh() ? FC_DONE : FC_CONTINUE;
                 final_check_status presult = m_plugin->final_check_eh(full);
                 if (presult != FC_DONE)
                     result = presult;
@@ -281,6 +293,10 @@ namespace smt {
 
     bool quantifier_manager::empty() const {
         return m_imp->empty();
+    }
+
+    bool quantifier_manager::find(symbol const & qid, quantifier * & q) const {
+        return m_imp->find(qid, q);
     }
 
     bool quantifier_manager::is_shared(enode * n) const {
@@ -346,7 +362,7 @@ namespace smt {
         return m_imp->m_plugin->model_based();
     }
 
-    bool quantifier_manager::mbqi_enabled(quantifier *q) const {
+    bool quantifier_manager::mbqi_enabled(quantifier * q) const {
         return m_imp->m_plugin->mbqi_enabled(q);
     }
 
@@ -372,7 +388,7 @@ namespace smt {
         quantifier_manager_plugin * plugin = m_imp->m_plugin->mk_fresh();
         m_imp->~imp();
         m_imp = new (m_imp) imp(*this, ctx, p, plugin);
-        plugin->set_manager(*this);        
+        plugin->set_manager(*this);
     }
 
     void quantifier_manager::display(std::ostream & out) const {
@@ -445,7 +461,7 @@ namespace smt {
 
         virtual bool model_based() const { return m_fparams->m_mbqi; }
 
-        virtual bool mbqi_enabled(quantifier *q) const {
+        virtual bool mbqi_enabled(quantifier * q) const {
             if (!m_fparams->m_mbqi_id) return true;
             const symbol &s = q->get_qid();
             size_t len = strlen(m_fparams->m_mbqi_id);
