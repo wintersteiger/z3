@@ -44,13 +44,13 @@ namespace smt {
         return false;
     }
 
-#define White 0 
+#define White 0
 #define Grey  1
 #define Black 2
 
     static int get_color(svector<int> & tcolors, svector<int> & fcolors, expr * n, bool gate_ctx) {
         svector<int> & colors = gate_ctx ? tcolors : fcolors;
-        if (colors.size() > n->get_id()) 
+        if (colors.size() > n->get_id())
             return colors[n->get_id()];
         return White;
     }
@@ -182,15 +182,15 @@ namespace smt {
     }
 
 #define DEEP_EXPR_THRESHOLD 1024
- 
+
     /**
        \brief Internalize an expression asserted into the logical context using the given proof as a justification.
-       
+
        \remark pr is 0 if proofs are disabled.
     */
     void context::internalize_assertion(expr * n, proof * pr, unsigned generation) {
-        TRACE("internalize_assertion", tout << mk_pp(n, m_manager) << "\n";); 
-        TRACE("internalize_assertion_ll", tout << mk_ll_pp(n, m_manager) << "\n";); 
+        TRACE("internalize_assertion", tout << mk_pp(n, m_manager) << "\n";);
+        TRACE("internalize_assertion_ll", tout << mk_ll_pp(n, m_manager) << "\n";);
         TRACE("generation", tout << "generation: " << m_generation << "\n";);
         TRACE("incompleteness_bug", tout << "[internalize-assertion]: #" << n->get_id() << "\n";);
         flet<unsigned> l(m_generation, generation);
@@ -201,7 +201,7 @@ namespace smt {
             TRACE("deep_internalize", tout << "expression is deep: #" << n->get_id() << "\n" << mk_ll_pp(n, m_manager););
             svector<expr_bool_pair> sorted_exprs;
             top_sort_expr(n, sorted_exprs);
-            TRACE("deep_internalize", 
+            TRACE("deep_internalize",
                   svector<expr_bool_pair>::const_iterator it  = sorted_exprs.begin();
                   svector<expr_bool_pair>::const_iterator end = sorted_exprs.end();
                   for (; it != end; ++it) {
@@ -221,7 +221,7 @@ namespace smt {
                 literal_buffer lits;
                 unsigned num = to_app(n)->get_num_args();
                 for (unsigned i = 0; i < num; i++) {
-                    expr * arg = to_app(n)->get_arg(i); 
+                    expr * arg = to_app(n)->get_arg(i);
                     internalize(arg, true);
                     lits.push_back(get_literal(arg));
                 }
@@ -315,7 +315,7 @@ namespace smt {
 
     /**
        \brief Internalize the given expression into the logical context.
-       
+
        - gate_ctx is true if the expression is in the context of a logical gate.
     */
     void context::internalize(expr * n, bool gate_ctx) {
@@ -356,7 +356,7 @@ namespace smt {
             // n was already internalized as a boolean.
             bool_var v = get_bool_var(n);
             TRACE("internalize_bug", tout << "#" << n->get_id() << " already has bool_var v" << v << "\n";);
-            
+
             // n was already internalized as boolean, but an enode was
             // not associated with it.  So, an enode is necessary, if
             // n is not in the context of a gate and is an application.
@@ -368,7 +368,7 @@ namespace smt {
                 }
                 else {
                     TRACE("internalize_bug", tout << "creating enode for #" << n->get_id() << "\n";);
-                    mk_enode(to_app(n), 
+                    mk_enode(to_app(n),
                              true, /* supress arguments, we not not use CC for this kind of enode */
                              true, /* bool enode must be merged with true/false, since it is not in the context of a gate */
                              false /* CC is not enabled */ );
@@ -387,7 +387,7 @@ namespace smt {
             internalize_distinct(to_app(n), gate_ctx);
         else if (is_app(n) && internalize_theory_atom(to_app(n), gate_ctx))
             return;
-        else if (is_quantifier(n)) 
+        else if (is_quantifier(n))
             internalize_quantifier(to_quantifier(n), gate_ctx);
         else
             internalize_formula_core(to_app(n), gate_ctx);
@@ -404,7 +404,7 @@ namespace smt {
         bool_var v        = get_bool_var(n);
         bool_var_data & d = get_bdata(v);
         d.set_eq_flag();
-        
+
         sort * s    = m_manager.get_sort(n->get_arg(0));
         theory * th = m_theories.get_plugin(s->get_family_id());
         if (th)
@@ -433,7 +433,7 @@ namespace smt {
         }
     }
 
-    /** 
+    /**
         \brief Try to internalize n as a theory atom. Return true if succeeded.
         The application can be internalize as a theory atom, if there is a theory (plugin)
         that can internalize n.
@@ -452,7 +452,7 @@ namespace smt {
             // if the formula is not in the context of a gate, then it
             // must be associated with an enode.
             if (!e_internalized(n)) {
-                mk_enode(to_app(n), 
+                mk_enode(to_app(n),
                          true, /* supress arguments, we not not use CC for this kind of enode */
                          true  /* bool enode must be merged with true/false, since it is not in the context of a gate */,
                          false /* CC is not enabled */);
@@ -483,7 +483,7 @@ namespace smt {
             SASSERT(n->get_decl()->is_flat_associative() || n->get_num_args() == n->get_decl()->get_arity());
         }
     };
-    
+
     /**
        Debugging code: check whether for all (non-ground) applications (f a_1 ... a_n) in t, f->get_arity() == n
     */
@@ -503,10 +503,10 @@ namespace smt {
         return true;
     }
 #endif
-    
+
     /**
        \brief Internalize the given quantifier into the logical
-       context. 
+       context.
     */
     void context::internalize_quantifier(quantifier * q, bool gate_ctx) {
         TRACE("internalize_quantifier", tout << mk_pp(q, m_manager) << "\n";);
@@ -540,17 +540,17 @@ namespace smt {
         // process args
         unsigned num   = n->get_num_args();
         for (unsigned i = 0; i < num; i++) {
-            expr * arg = n->get_arg(i); 
+            expr * arg = n->get_arg(i);
             internalize(arg, _is_gate);
         }
-        
+
         CTRACE("internalize_bug", b_internalized(n), tout << mk_ll_pp(n, m_manager) << "\n";);
-        
+
         bool is_new_var = false;
         bool_var v;
         // n can be already internalized after its children are internalized.
         // Example (ite-term): (= (ite c 1 0) 1)
-        // 
+        //
         // When (ite c 1 0) is internalized, it will force the internalization of (= (ite c 1 0) 1) and (= (ite c 1 0) 0)
         //
         // TODO: avoid the problem by delaying the internalization of (= (ite c 1 0) 1) and (= (ite c 1 0) 0).
@@ -611,14 +611,14 @@ namespace smt {
             case OP_XOR:
                 UNREACHABLE();
             case OP_OEQ:
-            case OP_INTERP:            
+            case OP_INTERP:
                 UNREACHABLE();
             default:
                 break;
             }
         }
-        
-        CTRACE("internalize_bug", e_internalized(n), 
+
+        CTRACE("internalize_bug", e_internalized(n),
                tout << "#" << n->get_id() << ", merge_tf: " << get_enode(n)->merge_tf() << "\n";);
     }
 
@@ -650,7 +650,7 @@ namespace smt {
             if (!is_new_var)
                 push_trail(set_merge_tf_trail(n));
             n->m_merge_tf = true;
-            lbool val = get_assignment(v); 
+            lbool val = get_assignment(v);
             if (val != l_undef)
                 push_eq(n, val == l_true ? m_true_enode : m_false_enode, eq_justification(literal(v, val == l_false)));
         }
@@ -738,8 +738,8 @@ namespace smt {
         expr * e  = n->get_arg(2);
         app_ref eq1(mk_eq_atom(n, t), m_manager);
         app_ref eq2(mk_eq_atom(n, e), m_manager);
-        mk_enode(n, 
-                 true /* supress arguments, I don't want to apply CC on ite terms */, 
+        mk_enode(n,
+                 true /* supress arguments, I don't want to apply CC on ite terms */,
                  false /* it is a term, so it should not be merged with true/false */,
                  false /* CC is not enabled */);
         internalize(c, true);
@@ -754,9 +754,9 @@ namespace smt {
               tout << mk_ismt2_pp(n, m_manager) << "\n";
               tout << mk_ismt2_pp(c, m_manager) << "\n";
               tout << mk_ismt2_pp(t, m_manager) << "\n";
-              tout << mk_ismt2_pp(e, m_manager) << "\n";              
-              tout << mk_ismt2_pp(eq1, m_manager) << "\n";              
-              tout << mk_ismt2_pp(eq2, m_manager) << "\n";              
+              tout << mk_ismt2_pp(e, m_manager) << "\n";
+              tout << mk_ismt2_pp(eq1, m_manager) << "\n";
+              tout << mk_ismt2_pp(eq2, m_manager) << "\n";
               tout << "literals:\n" << c_lit << " " << eq1_lit << " " << eq2_lit << "\n";);
         mk_gate_clause(~c_lit, eq1_lit);
         mk_gate_clause( c_lit, eq2_lit);
@@ -770,10 +770,10 @@ namespace smt {
         SASSERT(e_internalized(n));
     }
 
-    /** 
+    /**
         \brief Try to internalize a theory term. That is, a theory (plugin)
         will be invoked to internalize n. Return true if succeeded.
-        
+
         It may fail because there is no plugin or the plugin does not support it.
     */
     bool context::internalize_theory_term(app * n) {
@@ -791,12 +791,12 @@ namespace smt {
         // process args
         unsigned num = n->get_num_args();
         for (unsigned i = 0; i < num; i++) {
-            expr * arg = n->get_arg(i); 
+            expr * arg = n->get_arg(i);
             internalize(arg, false);
             SASSERT(e_internalized(arg));
         }
-        
-        enode * e = mk_enode(n, 
+
+        enode * e = mk_enode(n,
                              false, /* do not supress args */
                              false, /* it is a term, so it should not be merged with true/false */
                              true);
@@ -811,7 +811,7 @@ namespace smt {
         //SASSERT(!m_manager.is_not(n));
         unsigned id = n->get_id();
         bool_var v  = m_b_internalized_stack.size();
-#ifndef _EXTERNAL_RELEASE 
+#ifndef _EXTERNAL_RELEASE
         if (m_fparams.m_display_bool_var2expr) {
             char const * header = "(iff z3@";
             int  id_sz = 6;
@@ -823,7 +823,7 @@ namespace smt {
         }
 #endif
         TRACE("mk_bool_var", tout << "creating boolean variable: " << v << " for:\n" << mk_pp(n, m_manager) << "\n";);
-        TRACE("mk_var_bug", tout << "mk_bool: " << v << "\n";);                
+        TRACE("mk_var_bug", tout << "mk_bool: " << v << "\n";);
         set_bool_var(id, v);
         m_bdata.reserve(v+1);
         m_activity.reserve(v+1);
@@ -846,9 +846,9 @@ namespace smt {
         }
         bool_var_data & data = m_bdata[v];
         unsigned iscope_lvl = m_scope_lvl; // record when the boolean variable was internalized.
-        data.init(iscope_lvl); 
+        data.init(iscope_lvl);
         if (m_fparams.m_random_initial_activity == IA_RANDOM || (m_fparams.m_random_initial_activity == IA_RANDOM_WHEN_SEARCHING && m_searching))
-            m_activity[v]      = -((m_random() % 1000) / 1000.0); 
+            m_activity[v]      = -((m_random() % 1000) / 1000.0);
         else
             m_activity[v]      = 0.0;
         m_case_split_queue->mk_var_eh(v);
@@ -858,7 +858,7 @@ namespace smt {
         SASSERT(check_bool_var_vector_sizes());
         return v;
     }
-    
+
     void context::undo_mk_bool_var() {
         SASSERT(!m_b_internalized_stack.empty());
         m_stats.m_num_del_bool_var++;
@@ -877,13 +877,13 @@ namespace smt {
     }
 
     /**
-       \brief Create an new enode. 
+       \brief Create an new enode.
 
        \remark If suppress_args is true, then the enode is viewed as a constant
        in the egraph.
     */
     enode * context::mk_enode(app * n, bool suppress_args, bool merge_tf, bool cgc_enabled) {
-        TRACE("mk_enode_detail", tout << mk_pp(n, m_manager) << "\nsuppress_args: " << suppress_args << ", merge_tf: " << 
+        TRACE("mk_enode_detail", tout << mk_pp(n, m_manager) << "\nsuppress_args: " << suppress_args << ", merge_tf: " <<
               merge_tf << ", cgc_enabled: " << cgc_enabled << "\n";);
         SASSERT(!e_internalized(n));
         unsigned id          = n->get_id();
@@ -938,12 +938,12 @@ namespace smt {
         m_stats.m_num_mk_enode++;
         TRACE("mk_enode", tout << "created enode: #" << e->get_owner_id() << " for:\n" << mk_pp(n, m_manager) << "\n";
               if (e->get_num_args() > 0) {
-                  tout << "is_true_eq: " << e->is_true_eq() << " in cg_table: " << m_cg_table.contains_ptr(e) << " is_cgr: " 
+                  tout << "is_true_eq: " << e->is_true_eq() << " in cg_table: " << m_cg_table.contains_ptr(e) << " is_cgr: "
                        << e->is_cgr() << "\n";
               });
 
         if (m_manager.has_trace_stream())
-            m_manager.trace_stream() << "[attach-enode] #" << n->get_id() << " " << m_generation << "\n";        
+            m_manager.trace_stream() << "[attach-enode] #" << n->get_id() << " " << m_generation << "\n";
 
         return e;
     }
@@ -1013,15 +1013,15 @@ namespace smt {
        The following simplifications are applied:
 
        - Duplicates are removed.
-       
+
        - Literals assigned to false are removed
-       
+
        - If l and ~l are in lits, then return false (the clause is equivalent to true)
 
        - If a literal in source is assigned to true, then return false.
 
        \remark The removed literals are stored in simp_lits
-       
+
        It is safe to use the current assignment to simplify aux
        clauses because they are deleted during backtracking.
     */
@@ -1059,17 +1059,17 @@ namespace smt {
     /**
        \brief Simplify the literals of an auxiliary lemma. An
        auxiliary lemma has the status of a learned clause, but it is
-       not created by conflict resolution.  
+       not created by conflict resolution.
 
        A dynamic ackermann clause is an example of auxiliary lemma.
 
        The following simplifications are applied:
 
        - Duplicates are removed.
-       
+
        - If a literal is assigned to true at a base level, then return
          false (the clause is equivalent to true).
-       
+
        - If l and ~l are in lits, then return false (source is
          irrelevant, that is, it is equivalent to true)
 
@@ -1105,7 +1105,7 @@ namespace smt {
         TRACE("simplify_aux_lemma_literals", tout << "3) "; display_literals(tout, num_lits, lits); tout << "\n";);
         return true;
     }
-    
+
     /**
        \brief A clause (lemma or aux lemma) may need to be reinitialized for two reasons:
 
@@ -1113,7 +1113,7 @@ namespace smt {
        and the maximum internalization scope level of its literals is scope_lvl.
        Since the clauses may remain alive when scope_lvl is backtracked, it must
        be reinitialised. In this case, reinitialize_atoms must be true.
-     
+
        2) An aux lemma is in conflict or propagated a literal when it was created.
        Then, we should check whether the aux lemma is still in conflict or propagating
        a literal after backtracking the current scope level.
@@ -1122,7 +1122,7 @@ namespace smt {
         SASSERT(scope_lvl >= m_base_lvl);
         cls->m_reinit              = true;
         cls->m_reinternalize_atoms = reinternalize_atoms;
-        if (scope_lvl >= m_clauses_to_reinit.size()) 
+        if (scope_lvl >= m_clauses_to_reinit.size())
             m_clauses_to_reinit.resize(scope_lvl+1, clause_vector());
         m_clauses_to_reinit[scope_lvl].push_back(cls);
     }
@@ -1151,7 +1151,7 @@ namespace smt {
         // unit literal as relevant. When binary_clause_opt is used,
         // it is not possible to distinguish between learned and non-learned clauses.
         if (lemma && m_fparams.m_relevancy_lvl >= 2)
-            return false; 
+            return false;
         if (m_base_lvl > 0)
             return false;
         if (!lemma && m_scope_lvl > 0)
@@ -1213,7 +1213,7 @@ namespace smt {
        get_level(l) >= get_level(l')
 
        Without rule 3, boolean propagation is incomplete, that is, it may miss possible propagations.
-       
+
        \remark The method select_lemma_watch_lit is used to select the
        watch literal for regular learned clauses.
     */
@@ -1248,7 +1248,7 @@ namespace smt {
     }
 
     /**
-       \brief Add watch literal to the given clause. 
+       \brief Add watch literal to the given clause.
 
        \pre idx must be 0 or 1.
     */
@@ -1374,15 +1374,15 @@ namespace smt {
                 else if (get_assignment(cls->get_literal(1)) == l_false)
                     assign(cls->get_literal(0), b_justification(cls));
             }
-            
+
             if (lit_occs_enabled())
                 add_lit_occs(cls);
-            
+
             TRACE("add_watch_literal_bug", display_clause_detail(tout, cls););
             TRACE("mk_clause_result", display_clause_detail(tout, cls););
             CASSERT("mk_clause", check_clause(cls));
             return cls;
-        }} 
+        }}
     }
 
     void context::add_lit_occs(clause * cls) {
@@ -1402,10 +1402,10 @@ namespace smt {
         literal ls[3] = { l1, l2, l3 };
         mk_clause(3, ls, j);
     }
-    
+
     void context::mk_th_axiom(theory_id tid, unsigned num_lits, literal * lits, unsigned num_params, parameter * params) {
-        justification * js = 0; 
-        TRACE("mk_th_axiom", 
+        justification * js = 0;
+        TRACE("mk_th_axiom",
               display_literals_verbose(tout, num_lits, lits);
               tout << "\n";);
 
@@ -1420,7 +1420,7 @@ namespace smt {
         }
         mk_clause(num_lits, lits, js);
     }
-    
+
     void context::mk_th_axiom(theory_id tid, literal l1, literal l2, unsigned num_params, parameter * params) {
         literal ls[2] = { l1, l2 };
         mk_th_axiom(tid, 2, ls, num_params, params);
@@ -1436,7 +1436,7 @@ namespace smt {
         for (unsigned i = 0; i < num_lits; i++) {
             literal l      = lits[i];
             bool_var v     = l.var();
-            expr * atom    = m_bool_var2expr[v]; 
+            expr * atom    = m_bool_var2expr[v];
             new_lits.push_back(l.sign() ? m_manager.mk_not(atom) : atom);
         }
         if (root_gate)
@@ -1444,7 +1444,7 @@ namespace smt {
         SASSERT(num_lits > 1);
         expr * fact        = m_manager.mk_or(new_lits.size(), new_lits.c_ptr());
         return m_manager.mk_def_axiom(fact);
-        
+
     }
 
     void context::mk_gate_clause(unsigned num_lits, literal * lits) {
@@ -1533,9 +1533,9 @@ namespace smt {
             TRACE("propagate_relevant_ite", tout << "#" << n->get_id() << ", eh: " << eh << "\n";);
             add_rel_watch(l, eh);
             add_rel_watch(~l, eh);
-        }    
+        }
     }
-    
+
     void context::mk_not_cnstr(app * n) {
         SASSERT(b_internalized(n));
         bool_var v = get_bool_var(n);
@@ -1544,7 +1544,7 @@ namespace smt {
         mk_gate_clause(~l, ~c);
         mk_gate_clause(l,   c);
     }
-    
+
     void context::mk_and_cnstr(app * n) {
         literal l = get_literal(n);
         TRACE("mk_and_cnstr", tout << "l: "; display_literal(tout, l); tout << "\n";);
@@ -1611,14 +1611,14 @@ namespace smt {
             DEBUG_CODE(m_th_var = n->get_th_var(th_id););
             SASSERT(m_th_var != null_theory_var);
         }
-        
+
         virtual void undo(context & ctx) {
             theory_var v = m_enode->get_th_var(m_th_id);
             SASSERT(v != null_theory_var);
             SASSERT(m_th_var == v);
             m_enode->del_th_var(m_th_id);
             enode * root = m_enode->get_root();
-            if (root != m_enode && root->get_th_var(m_th_id) == v) 
+            if (root != m_enode && root->get_th_var(m_th_id) == v)
                 root->del_th_var(m_th_id);
         }
     };
@@ -1636,7 +1636,7 @@ namespace smt {
             m_th_id(th_id),
             m_old_th_var(old_var) {
         }
-        
+
         virtual void undo(context & ctx) {
             SASSERT(m_enode->get_th_var(m_th_id) != null_theory_var);
             m_enode->replace_th_var(m_old_th_var, m_th_id);
@@ -1645,13 +1645,13 @@ namespace smt {
 
 
     /**
-       \brief Attach theory var v to the enode n. 
+       \brief Attach theory var v to the enode n.
 
        Enode n is to attached to any theory variable of th.
 
        This method should be invoked whenever the theory creates a new theory variable.
 
-       \remark The methods new_eq_eh and new_diseq_eh of th may be invoked before this method 
+       \remark The methods new_eq_eh and new_diseq_eh of th may be invoked before this method
        returns.
     */
     void context::attach_th_var(enode * n, theory * th, theory_var v) {
