@@ -273,7 +273,7 @@ namespace smt {
         }
 
         /**
-           \brief Similar to get_enode, but returns 0 if n is to e_internalized.
+           \brief Similar to get_enode, but returns 0 if n is not e_internalized.
         */
         enode * find_enode(expr const * n) const {
             return m_app2enode.get(n->get_id(), 0);
