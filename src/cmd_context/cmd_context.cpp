@@ -1137,11 +1137,11 @@ void cmd_context::reset(bool finalize) {
     m_check_logic.reset();
     reset_object_refs();
     reset_cmds();
-    reset_psort_decls();
     restore_aux_pdecls(0);
     reset_macros();
     reset_func_decls();
-    restore_assertions(0);
+    restore_assertions(0); // CMW: This can (re-)initialize the manager, (re-)populating the psort_decls ...
+    reset_psort_decls(); // ... so this must came afterwards.
     if (m_solver)
         m_solver = 0;
     m_scopes.reset();
