@@ -346,8 +346,8 @@ namespace smt {
             return;
 
         if (m_manager.is_not(n) && gate_ctx) {
-            // a boolean variable does not need to be created if n a NOT gate is in
-            // the context of a gate.
+            // A boolean variable does not need to be created if n is a NOT
+            // gate in the context of another gate.
             internalize(to_app(n)->get_arg(0), true);
             return;
         }
