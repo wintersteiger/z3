@@ -101,6 +101,10 @@ namespace smt {
             return m_context.get_consequences(assumptions, vars, conseq, unfixed);
         }
 
+        virtual bool add_quantifier_instance(expr_ref const & instance) {
+            return m_context.add_quantifier_instance(instance);
+        }
+
         virtual lbool find_mutexes(expr_ref_vector const& vars, vector<expr_ref_vector>& mutexes) {
             return m_context.find_mutexes(vars, mutexes);
         }

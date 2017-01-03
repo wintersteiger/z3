@@ -33,6 +33,8 @@ public:
     void reset();
     void update(char const * key, unsigned inc);
     void update(char const * key, double inc);
+    unsigned get_uint(char const * key) const;
+    double get_double(char const * key) const;
     void display(std::ostream & out) const;
     void display_smt2(std::ostream & out) const;
     void display_internal(std::ostream & out) const;

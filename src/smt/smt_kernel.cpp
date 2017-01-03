@@ -115,6 +115,10 @@ namespace smt {
             return m_kernel.get_consequences(assumptions, vars, conseq, unfixed);
         }
 
+        bool add_quantifier_instance(expr_ref const & instance) {
+            return m_kernel.m_search_log.replay_instance(instance);
+        }
+
         lbool preferred_sat(expr_ref_vector const& asms, vector<expr_ref_vector>& cores) {
             return m_kernel.preferred_sat(asms, cores);
         }
@@ -285,6 +289,10 @@ namespace smt {
 
     lbool kernel::get_consequences(expr_ref_vector const& assumptions, expr_ref_vector const& vars, expr_ref_vector& conseq, expr_ref_vector& unfixed) {
         return m_imp->get_consequences(assumptions, vars, conseq, unfixed);
+    }
+
+    bool kernel::add_quantifier_instance(expr_ref const & instance) {
+        return m_imp->add_quantifier_instance(instance);
     }
 
     lbool kernel::preferred_sat(expr_ref_vector const& asms, vector<expr_ref_vector>& cores) {

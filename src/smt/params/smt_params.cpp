@@ -49,6 +49,7 @@ void smt_params::updt_local_params(params_ref const & _p) {
     else if (_p.get_bool("arith.least_error_pivot", false))
         m_arith_pivot_strategy = ARITH_PIVOT_LEAST_ERROR;
     theory_array_params::updt_params(_p);
+    m_search_log = p.search_log();
 }
 
 void smt_params::updt_params(params_ref const & p) {
@@ -158,4 +159,7 @@ void smt_params::display(std::ostream & out) const {
     DISPLAY_PARAM(m_check_at_labels);
     DISPLAY_PARAM(m_dump_goal_as_smt);
     DISPLAY_PARAM(m_auto_config);
+
+    DISPLAY_PARAM(m_string_solver);
+    DISPLAY_PARAM(m_search_log);
 }

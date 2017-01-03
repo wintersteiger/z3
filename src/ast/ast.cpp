@@ -1313,7 +1313,9 @@ ast_manager::ast_manager(proof_gen_mode m, char const * trace_file, bool is_form
     m_proof_mode(m),
     m_trace_stream(0),
     m_trace_stream_owner(false),
-    m_rec_fun(":rec-fun") {
+    m_rec_fun(":rec-fun"),
+    new_func_decl_eh(0),
+    erase_func_decl_eh(0) {
 
     if (trace_file) {
         m_trace_stream       = alloc(std::fstream, trace_file, std::ios_base::out);
@@ -1335,7 +1337,9 @@ ast_manager::ast_manager(proof_gen_mode m, std::fstream * trace_stream, bool is_
     m_proof_mode(m),
     m_trace_stream(trace_stream),
     m_trace_stream_owner(false),
-    m_rec_fun(":rec-fun") {
+    m_rec_fun(":rec-fun"),
+    new_func_decl_eh(0),
+    erase_func_decl_eh(0) {
 
     if (!is_format_manager)
         m_format_manager = alloc(ast_manager, PGM_DISABLED, trace_stream, true);
@@ -1352,7 +1356,9 @@ ast_manager::ast_manager(ast_manager const & src, bool disable_proofs):
     m_proof_mode(disable_proofs ? PGM_DISABLED : src.m_proof_mode),
     m_trace_stream(src.m_trace_stream),
     m_trace_stream_owner(false),
-    m_rec_fun(":rec-fun") {
+    m_rec_fun(":rec-fun"),
+    new_func_decl_eh(0),
+    erase_func_decl_eh(0) {
     SASSERT(!src.is_format_manager());
     m_format_manager = alloc(ast_manager, PGM_DISABLED, m_trace_stream, true);
     init();
@@ -1422,7 +1428,7 @@ ast_manager::~ast_manager() {
     }
     it = m_plugins.begin();
     for (; it != end; ++it) {
-        if (*it) 
+        if (*it)
             dealloc(*it);
     }
     m_plugins.reset();
@@ -1464,15 +1470,15 @@ ast_manager::~ast_manager() {
                 mark_array_ref(mark, to_quantifier(n)->get_num_patterns(), to_quantifier(n)->get_patterns());
                 mark_array_ref(mark, to_quantifier(n)->get_num_no_patterns(), to_quantifier(n)->get_no_patterns());
                 break;
-            }           
-        }        
+            }
+        }
         it_a = m_ast_table.begin();
         for (; it_a != end_a; ++it_a) {
             ast* n = *it_a;
             if (!mark.is_marked(n)) {
                 roots.push_back(n);
             }
-        }        
+        }
         SASSERT(!roots.empty());
         for (unsigned i = 0; i < roots.size(); ++i) {
             ast* a = roots[i];
@@ -1535,8 +1541,17 @@ void ast_manager::compress_ids() {
     m_ast_table.finalize();
     ptr_vector<ast>::iterator it2  = asts.begin();
     ptr_vector<ast>::iterator end2 = asts.end();
-    for (; it2 != end2; ++it2)
+    for (; it2 != end2; ++it2) {
         m_ast_table.insert(*it2);
+    }
+    if (new_func_decl_eh) {
+        ast_table::iterator it = m_ast_table.begin();
+        ast_table::iterator end = m_ast_table.end();
+        for (; it2 != end2; ++it2) {
+            if (is_func_decl(*it2))
+                new_func_decl_eh(to_func_decl(*it2));
+        }
+    }
 }
 
 void ast_manager::raise_exception(char const * msg) {
@@ -1745,6 +1760,7 @@ ast * ast_manager::register_node_core(ast * n) {
         }
         inc_array_ref(to_func_decl(n)->get_arity(), to_func_decl(n)->get_domain());
         inc_ref(to_func_decl(n)->get_range());
+        if (new_func_decl_eh) new_func_decl_eh(to_func_decl(n));
         break;
     case AST_APP: {
         app * t = to_app(n);
@@ -1849,6 +1865,7 @@ void ast_manager::delete_node(ast * n) {
             }
             break;
         case AST_FUNC_DECL:
+            if (erase_func_decl_eh) erase_func_decl_eh(to_func_decl(n));
             if (to_func_decl(n)->m_info != 0 && !m_debug_ref_count) {
                 func_decl_info * info = to_func_decl(n)->get_info();
                 info->del_eh(*this);

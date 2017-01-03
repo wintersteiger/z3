@@ -25,6 +25,7 @@ Revision History:
 #include"mam.h"
 #include"qi_queue.h"
 #include"ast_smt2_pp.h"
+#include"dec_ref_util.h"
 
 namespace smt {
 
@@ -41,6 +42,10 @@ namespace smt {
         scoped_ptr<quantifier_manager_plugin>  m_plugin;
         unsigned                               m_num_instances;
 
+        id_gen                                 m_lqids;
+        u_map<quantifier *>                    m_lqid2q;
+        obj_map<quantifier, unsigned>          m_q2lqid;
+
         imp(quantifier_manager & wrapper, context & ctx, smt_params & p, quantifier_manager_plugin * plugin) :
             m_wrapper(wrapper),
             m_context(ctx),
@@ -52,9 +57,13 @@ namespace smt {
             m_qi_queue.setup();
         }
 
+        ~imp() {
+            dec_ref_values(m_context.get_manager(), m_lqid2q);
+        }
+
         ast_manager& m() const { return m_context.get_manager(); }
-        bool has_trace_stream() const { return m().has_trace_stream(); }
-        std::ostream & trace_stream() { return m().trace_stream(); }
+        bool has_trace_stream() const { return m_context.get_manager().has_trace_stream(); }
+        std::ostream & trace_stream() { return m_context.get_manager().trace_stream(); }
 
         quantifier_stat * get_stat(quantifier * q) const {
             return m_quantifier_stat.find(q);
@@ -65,22 +74,55 @@ namespace smt {
         }
 
         void add(quantifier * q, unsigned generation) {
-            TRACE("add_quantifier", tout << "New quantifier '" << q->get_qid() << "' (gen " << generation << "): " << mk_ismt2_pp(q, m_context.get_manager()) << std::endl;);
+            assign_lqid(q);
+            TRACE("add_quantifier", tout << "New quantifier '" << q->get_qid() << "' (gen " << generation << ", lqid=" << get_lqid(q) << "): " << mk_ismt2_pp(q, m_context.get_manager()) << std::endl;);
+            ast_manager & m = m_context.get_manager();
             quantifier_stat * stat = m_qstat_gen(q, generation);
             m_quantifier_stat.insert(q, stat);
             m_quantifiers.push_back(q);
+            m.inc_ref(q);
             m_plugin->add(q);
         }
 
-        bool find(symbol const & qid, quantifier * & q) const {
-            ptr_vector<quantifier>::const_iterator it = m_quantifiers.begin();
-            ptr_vector<quantifier>::const_iterator end = m_quantifiers.end();
-            for (; it != end; it++)
-                if ((*it)->get_qid() == qid) {
-                    q = *it;
-                    return true;
-                }
-            return false;
+        bool find(unsigned lqid, quantifier * & q) const {
+            return m_lqid2q.find(lqid, q);
+        }
+
+        unsigned get_lqid(quantifier * q) const {
+            SASSERT(m_q2lqid.contains(q));
+            return m_q2lqid.find(q);
+        }
+
+        void assign_lqid(quantifier * q) {
+            ast_manager & m = m_context.get_manager();
+            unsigned lqid;
+            if (m_q2lqid.find(q, lqid)) {
+                DEBUG_CODE({
+                    quantifier * k;
+                    SASSERT(m_lqid2q.find(lqid, k));
+                    SASSERT(k == q);
+                });
+            }
+            else {
+                lqid = m_lqids.mk();
+                TRACE("qi_log_instance_detail",
+                    tout << "Assign quantifier #" << lqid << std::endl;
+                    tout << mk_ismt2_pp(q, m) << std::endl; );
+                m.inc_ref(q);
+                m_lqid2q.insert(lqid, q);
+                m_q2lqid.insert(q, lqid);
+            }
+        }
+
+        void unassign_lqid(quantifier * q) {
+            ast_manager & m = m_context.get_manager();
+            unsigned lqid = m_q2lqid.find(q);
+            TRACE("qi_log_instance_detail", tout << "Unassign quantifier #" << lqid << std::endl; );
+            m.dec_ref(q);
+            m_lqid2q.erase(lqid);
+            m_q2lqid.erase(q);
+            m_lqids.recycle(lqid);
+
         }
 
         void display_stats(std::ostream & out, quantifier * q) {
@@ -100,11 +142,15 @@ namespace smt {
         }
 
         void del(quantifier * q) {
+            TRACE("del_quantifier_qm", tout << "Deleting quantifier '" << q->get_qid() << "'." << std::endl;);
             if (m_params.m_qi_profile) {
                 display_stats(verbose_stream(), q);
             }
+            SASSERT(q == m_quantifiers.back());
+            m_context.get_manager().dec_ref(m_quantifiers.back());
             m_quantifiers.pop_back();
             m_quantifier_stat.erase(q);
+            unassign_lqid(q);
         }
 
         bool empty() const {
@@ -144,10 +190,24 @@ namespace smt {
                         out << " #" << (*it)->get_owner_id();
                     out << "\n";
                 }
+
+                TRACE("qi_new_instance",
+                    ast_manager & m = m_context.get_manager();
+                    tout << "Quantifier " << q->get_qid() << ": " << std::endl;
+                    tout << mk_ismt2_pp(q, m) << std::endl;
+                    tout << "Pattern: ";
+                    if (pat) tout << mk_ismt2_pp(pat, m);
+                    else tout << "None.";
+                    tout << std::endl;
+                    tout << "Bindings: " << std::endl;
+                    for (unsigned i = 0; i < num_bindings; i++)
+                        tout << mk_ismt2_pp(bindings[i]->get_owner(), m) << std::endl;
+                    );
+
                 m_qi_queue.insert(f, pat, max_generation, min_top_generation, max_top_generation); // TODO
                 m_num_instances++;
             }
-            TRACE("quantifier", 
+            TRACE("quantifier",
                   tout << mk_pp(q, m()) << " ";
                   for (unsigned i = 0; i < num_bindings; ++i) {
                       tout << mk_pp(bindings[i]->get_owner(), m()) << " ";
@@ -170,6 +230,10 @@ namespace smt {
             m_qi_queue.init_search_eh();
             m_plugin->init_search_eh();
             TRACE("smt_params", m_params.display(tout); );
+        }
+
+        void end_search_eh() {
+            m_qi_queue.end_search_eh();
         }
 
         void assign_eh(quantifier * q) {
@@ -262,7 +326,6 @@ namespace smt {
                 return SAT;
             return m_plugin->check_model(m, root2value);
         }
-
     };
 
     quantifier_manager::quantifier_manager(context & ctx, smt_params & fp, params_ref const & p) {
@@ -291,12 +354,24 @@ namespace smt {
         m_imp->del(q);
     }
 
-    bool quantifier_manager::empty() const {
-        return m_imp->empty();
+    bool quantifier_manager::find(unsigned lqid, quantifier * & q) const {
+        return m_imp->find(lqid, q);
     }
 
-    bool quantifier_manager::find(symbol const & qid, quantifier * & q) const {
-        return m_imp->find(qid, q);
+    unsigned quantifier_manager::get_lqid(quantifier * q) const {
+        return m_imp->get_lqid(q);
+    }
+
+    void quantifier_manager::assign_lqid(quantifier * q) {
+        m_imp->assign_lqid(q);
+    }
+
+    void quantifier_manager::unassign_lqid(quantifier * q) {
+        m_imp->unassign_lqid(q);
+    }
+
+    bool quantifier_manager::empty() const {
+        return m_imp->empty();
     }
 
     bool quantifier_manager::is_shared(enode * n) const {
@@ -328,6 +403,10 @@ namespace smt {
 
     void quantifier_manager::init_search_eh() {
         m_imp->init_search_eh();
+    }
+
+    void quantifier_manager::end_search_eh() {
+        m_imp->end_search_eh();
     }
 
     void quantifier_manager::assign_eh(quantifier * q) {
@@ -506,6 +585,8 @@ namespace smt {
             }
         }
 
+        virtual void end_search_eh() { }
+
         virtual void assign_eh(quantifier * q) {
             m_active = true;
             if (!m_fparams->m_ematching) {
@@ -607,7 +688,13 @@ namespace smt {
         check_model(proto_model * m, obj_map<enode, app *> const & root2value) {
             if (m_fparams->m_mbqi) {
                 IF_VERBOSE(10, verbose_stream() << "(smt.mbqi)\n";);
-                if (m_model_checker->check(m, root2value)) {
+                m_context->m_search_log.note("MBQI model check starts here");
+                char const * slb = m_fparams->m_search_log;
+                m_fparams->m_search_log = "";
+                bool r = m_model_checker->check(m, root2value);
+                m_context->m_search_log.note("MBQI model check ends here");
+                m_fparams->m_search_log = slb;
+                if (r) {
                     return quantifier_manager::SAT;
                 }
                 else if (m_model_checker->has_new_instances()) {

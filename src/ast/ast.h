@@ -2206,6 +2206,11 @@ private:
             dec_ref(worklist, a[i]);
         }
     }
+
+public:
+    // CMW: This is a bit of a hack; suggestions welcome.
+    void (*new_func_decl_eh)(func_decl * fd);
+    void (*erase_func_decl_eh)(func_decl * fd);
 };
 
 typedef ast_manager::expr_array expr_array;

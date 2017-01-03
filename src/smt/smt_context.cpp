@@ -83,7 +83,8 @@ namespace smt {
         m_generation(0),
         m_last_search_result(l_undef),
         m_last_search_failure(UNKNOWN),
-        m_searching(false) {
+        m_searching(false),
+        m_search_log(m, *this, *m_qmanager) {
 
         SASSERT(m_scope_lvl == 0);
         SASSERT(m_base_lvl == 0);
@@ -299,7 +300,7 @@ namespace smt {
         d.set_justification(j);
     }
 
-    
+
     void context::assign_core(literal l, b_justification j, bool decision) {
         TRACE("assign_core", tout << (decision?"decision: ":"propagating: ") << l << " ";
               display_literal_verbose(tout, l); tout << " level: " << m_scope_lvl << "\n";
@@ -319,7 +320,7 @@ namespace smt {
         d.m_phase                  = !l.sign();
         TRACE("phase_selection", tout << "saving phase, is_pos: " << d.m_phase << " l: " << l << "\n";);
 
-        TRACE("relevancy", 
+        TRACE("relevancy",
               tout << "is_atom: " << d.is_atom() << " is relevant: " << is_relevant_core(l) << "\n";);
         if (d.is_atom() && (m_fparams.m_relevancy_lvl == 0 || (m_fparams.m_relevancy_lvl == 1 && !d.is_quantifier()) || is_relevant_core(l)))
             m_atom_propagation_queue.push_back(l);
@@ -331,7 +332,7 @@ namespace smt {
         // a unit is asserted at search level. Mark it as relevant.
         // this addresses bug... where a literal becomes fixed to true (false)
         // as a conflict gets assigned misses relevancy (and quantifier instantiation).
-        // 
+        //
         if (false && !decision && relevancy() && at_search_level() && !is_relevant_core(l)) {
             mark_as_relevant(l);
         }
@@ -1859,7 +1860,7 @@ namespace smt {
 
         m_stats.m_num_decisions++;
 
-        push_scope();
+        push_scope(false);
         TRACE("decide", tout << "splitting, lvl: " << m_scope_lvl << "\n";);
 
         TRACE("decide_detail", tout << mk_pp(bool_var2expr(var), m_manager) << "\n";);
@@ -1919,6 +1920,8 @@ namespace smt {
         TRACE("decide", tout << "case split pos: " << is_pos << " p" << var << "\n"
               << "activity: " << get_activity(var) << "\n";);
 
+        m_search_log.decide(bool_var2expr(var), is_pos);
+
         assign(literal(var, !is_pos), b_justification::mk_axiom(), true);
         return true;
     }
@@ -1949,7 +1952,7 @@ namespace smt {
     /**
        \brief Create an internal backtracking point
     */
-    void context::push_scope() {
+    void context::push_scope(bool log) {
 
         if (m_manager.has_trace_stream())
             m_manager.trace_stream() << "[push] " << m_scope_lvl << "\n";
@@ -1958,6 +1961,9 @@ namespace smt {
         m_region.push_scope();
         m_scopes.push_back(scope());
         scope & s = m_scopes.back();
+
+        if (log)
+            m_search_log.push(m_scope_lvl);
 
         m_relevancy_propagator->push();
         s.m_assigned_literals_lim    = m_assigned_literals.size();
@@ -2400,7 +2406,7 @@ namespace smt {
 
        \warning This method will not invoke reset_cache_generation.
     */
-    unsigned context::pop_scope_core(unsigned num_scopes) {
+    unsigned context::pop_scope_core(unsigned num_scopes, bool log) {
 
         if (m_manager.has_trace_stream())
             m_manager.trace_stream() << "[pop] " << num_scopes << " " << m_scope_lvl << "\n";
@@ -2411,7 +2417,10 @@ namespace smt {
         SASSERT(num_scopes <= m_scope_lvl);
         SASSERT(m_scopes.size() == m_scope_lvl);
 
-        unsigned new_lvl    = m_scope_lvl - num_scopes;
+        unsigned new_lvl = m_scope_lvl - num_scopes;
+
+        if (log)
+            m_search_log.pop(m_scope_lvl, num_scopes);
 
         cache_generation(new_lvl);
         m_qmanager->pop(num_scopes);
@@ -3211,6 +3220,9 @@ namespace smt {
                 m_unsat_core.push_back(m_literal2assumption[l.index()]);
             }
         }
+        if (true) {
+            // collect patterns from quantifiers?
+        }
         reset_assumptions();
         pop_to_base_lvl(); // undo the push_scope() performed by init_assumptions
         m_search_lvl = m_base_lvl;
@@ -3270,6 +3282,9 @@ namespace smt {
     lbool context::setup_and_check(bool reset_cancel) {
         if (!check_preamble(reset_cancel))
             return l_undef;
+
+        m_search_log.note("(check-sat) starts here (setup_and_check).");
+
         SASSERT(m_scope_lvl == 0);
         SASSERT(!m_setup.already_configured());
         setup_context(m_fparams.m_auto_config);
@@ -3297,6 +3312,9 @@ namespace smt {
             }
         }
         r = check_finalize(r);
+
+        m_search_log.check_sat(r, m_stats);
+
         return r;
     }
 
@@ -3331,6 +3349,7 @@ namespace smt {
         m_random.set_seed(m_fparams.m_random_seed);
         m_dyn_ack_manager.setup();
         m_conflict_resolution->setup();
+        m_search_log.enable(m_fparams);
 
         if (!relevancy())
             m_fparams.m_relevancy_lemma = false;
@@ -3377,12 +3396,15 @@ namespace smt {
         pop_to_base_lvl();
         TRACE("before_search", display(tout););
         SASSERT(at_base_level());
+
         lbool r = l_undef;
         if (inconsistent()) {
             r = l_false;
+            m_search_log.check_sat(r, m_stats, num_assumptions);
         }
         else {
             setup_context(false);
+            m_search_log.note("(check-sat) starts here (check(assumptions)).");
             internalize_assertions();
             TRACE("after_internalize_assertions", display(tout););
             if (m_asserted_formulas.inconsistent()) {
@@ -3408,10 +3430,13 @@ namespace smt {
                             r = l_undef;
                         }
                     }
+
                 }
+                m_search_log.check_sat(r, m_stats, num_assumptions);
             }
         }
         r = check_finalize(r);
+
         return r;
     }
 
@@ -3445,6 +3470,7 @@ namespace smt {
 
     void context::end_search() {
         m_case_split_queue ->end_search_eh();
+        m_qmanager->end_search_eh();
     }
 
     void context::inc_limits() {
@@ -3904,11 +3930,14 @@ namespace smt {
                       static ast_mark visited;
                       ast_ll_pp(tout, m_manager, pr, visited););
             }
+
             // I invoke pop_scope_core instead of pop_scope because I don't want
             // to reset cached generations... I need them to rebuild the literals
             // of the new conflict clause.
             if (relevancy()) record_relevancy(num_lits, lits);
-            unsigned num_bool_vars = pop_scope_core(m_scope_lvl - new_lvl);
+            unsigned lvls = m_scope_lvl - new_lvl;
+            unsigned num_bool_vars = pop_scope_core(lvls, false);
+            m_search_log.lemma(*m_conflict_resolution, lvls);
             SASSERT(m_scope_lvl == new_lvl);
             // the logical context may still be in conflict after
             // clauses are reinitialized in pop_scope.
@@ -3939,7 +3968,9 @@ namespace smt {
                     }
                 }
             }
+
             if (relevancy()) restore_relevancy(num_lits, lits);
+
             // Resetting the cache manually because I did not invoke pop_scope, but pop_scope_core
             reset_cache_generation();
             TRACE("resolve_conflict_bug",
@@ -4022,7 +4053,7 @@ namespace smt {
         }
         return false;
     }
-    
+
     /*
       \brief we record and restore relevancy information for literals in conflict clauses.
       A literal may have been marked relevant within the scope that gets popped during
@@ -4317,7 +4348,7 @@ namespace smt {
         if (fcs == FC_DONE) {
             mk_proto_model(l_true);
             m_model = m_proto_model->mk_model();
-            add_rec_funs_to_model();            
+            add_rec_funs_to_model();
         }
 
         return fcs == FC_DONE;
@@ -4386,11 +4417,10 @@ namespace smt {
                 func_decl* f = to_app(fn)->get_decl();
                 func_interp* fi = alloc(func_interp, m, f->get_arity());
                 fi->set_else(body);
-                m_model->register_decl(f, fi);            
+                m_model->register_decl(f, fi);
             }
         }
     }
-
 };
 
 

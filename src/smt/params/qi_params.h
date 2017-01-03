@@ -44,8 +44,6 @@ struct qi_params {
     unsigned           m_qi_max_instances;
     bool               m_qi_lazy_instantiation;
     bool               m_qi_conservative_final_check;
-    std::string        m_qi_log_in_filename;
-    std::string        m_qi_log_out_filename;
 
     bool               m_mbqi;
     unsigned           m_mbqi_max_cexs;
@@ -95,8 +93,6 @@ struct qi_params {
         m_qi_max_instances(UINT_MAX),
         m_qi_lazy_instantiation(false),
         m_qi_conservative_final_check(false),
-        m_qi_log_in_filename(""),
-        m_qi_log_out_filename(""),
         m_mbqi(true), // enabled by default
         m_mbqi_max_cexs(1),
         m_mbqi_max_cexs_incr(1),

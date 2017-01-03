@@ -33,6 +33,24 @@ void statistics::update(char const * key, double inc) {
         m_d_stats.push_back(key_d_val_pair(key, inc));
 }
 
+unsigned statistics::get_uint(char const * key) const {
+    svector<key_val_pair>::const_iterator it = m_stats.begin();
+    svector<key_val_pair>::const_iterator end = m_stats.end();
+    for (; it != end; )
+        if (strcmp(it->first, key) == 0)
+            return it->second;
+    return 0;
+}
+
+double statistics::get_double(char const * key) const {
+    svector<key_d_val_pair>::const_iterator it = m_d_stats.begin();
+    svector<key_d_val_pair>::const_iterator end = m_d_stats.end();
+    for (; it != end; )
+        if (strcmp(it->first, key) == 0)
+            return it->second;
+    return 0.0;
+}
+
 void statistics::copy(statistics const & st) {
     m_stats.append(st.m_stats);
     m_d_stats.append(st.m_d_stats);
@@ -49,7 +67,7 @@ static void mk_map(V const & v, M & m) {
     typename V::const_iterator end = v.end();
     for (; it != end; ++it) {
         typename V::data::second_type val;
-        if (m.find(it->first, val)) 
+        if (m.find(it->first, val))
             m.insert(it->first, it->second + val);
         else
             m.insert(it->first, it->second);
@@ -99,7 +117,7 @@ unsigned get_max_len(ptr_buffer<char> & keys) {
     return max;
 }
 
-void statistics::display_smt2(std::ostream & out) const {   
+void statistics::display_smt2(std::ostream & out) const {
 #define INIT_DISPLAY()                                  \
     key2val m_u;                                        \
     key2dval m_d;                                       \
@@ -109,7 +127,7 @@ void statistics::display_smt2(std::ostream & out) const {
     get_keys(m_u, keys);                                \
     get_keys(m_d, keys);                                \
     std::sort(keys.begin(), keys.end(), str_lt());      \
-    unsigned max = get_max_len(keys);                   
+    unsigned max = get_max_len(keys);
 
     INIT_DISPLAY();
     bool first = true;
@@ -123,11 +141,11 @@ void statistics::display_smt2(std::ostream & out) const {
             out << " ";                                         \
         first = false;                                          \
     }
-    
+
     out << "(";
     for (unsigned i = 0; i < keys.size(); i++) {
         char * k = keys.get(i);
-        unsigned val; 
+        unsigned val;
         if (m_u.find(k, val)) {
             DISPLAY_KEY();
             out << " " << val;
@@ -157,7 +175,7 @@ void statistics::display(std::ostream & out) const {
 
     for (unsigned i = 0; i < keys.size(); i++) {
         char * k = keys.get(i);
-        unsigned val; 
+        unsigned val;
         if (m_u.find(k, val)) {
             DISPLAY_KEY();
             out << " " << val << "\n";
@@ -191,10 +209,10 @@ static void display_internal(std::ostream & out, M const & m) {
 }
 
 void statistics::display_internal(std::ostream & out) const {
-    key2val m_u;                                                
-    key2dval m_d;                                               
-    mk_map(m_stats, m_u);                                       
-    mk_map(m_d_stats, m_d);            
+    key2val m_u;
+    key2dval m_d;
+    mk_map(m_stats, m_u);
+    mk_map(m_d_stats, m_d);
 
     ::display_internal(out, m_u);
     ::display_internal(out, m_d);
@@ -241,7 +259,7 @@ void get_memory_statistics(statistics& st) {
     unsigned long long mem = memory::get_allocation_size();
     max_mem = (100*max_mem)/(1024*1024);
     mem = (100*mem)/(1024*1024);
-    st.update("max memory", static_cast<double>(max_mem)/100.0);    
+    st.update("max memory", static_cast<double>(max_mem)/100.0);
     st.update("memory", static_cast<double>(mem)/100.0);
     get_uint64_stats(st, "num allocs",  memory::get_allocation_count());
 }

@@ -134,6 +134,11 @@ namespace smt {
                                expr_ref_vector& conseq, expr_ref_vector& unfixed);
 
         /**
+            \brief add a quantifier instance.
+        */
+        bool add_quantifier_instance(expr_ref const & instance);
+
+        /**
           \brief find mutually exclusive variables.
          */
         lbool find_mutexes(expr_ref_vector const& vars, vector<expr_ref_vector>& mutexes);

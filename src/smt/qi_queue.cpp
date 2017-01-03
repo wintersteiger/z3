@@ -40,33 +40,13 @@ namespace smt {
         m_evaluator(m_manager),
         m_subst(m_manager),
         m_instances(m_manager),
-        m_instance_log_in(0),
-        m_instance_log_out(0),
-        m_instance_log_first_check(true),
-		m_cctx(0) {
+        m_search_log(ctx.m_search_log) {
         init_parser_vars();
         m_vals.resize(15, 0.0f);
-        m_instance_out_pp_params.set_bool("single_line", true);
     }
 
     qi_queue::~qi_queue() {
-        if (m_instance_log_in) {
-            if (m_instance_log_in->is_open())
-                m_instance_log_in->close();
-            delete(m_instance_log_in);
-        }
-        if (m_instance_log_out) {
-            if (m_instance_log_out->is_open()) {
-                m_instance_log_out->flush();
-                m_instance_log_out->close();
-            }
-            delete(m_instance_log_out);
-        }
-		if (m_cctx) {
-			//m_cctx->pop(m_cctx->num_scopes());
-			dealloc(m_cctx);
-			m_cctx = 0;
-		}
+        m_subst.reset();
     }
 
     void qi_queue::setup() {
@@ -87,27 +67,6 @@ namespace smt {
             VERIFY(m_parser.parse_string("cost", m_new_gen_function));
         }
         m_eager_cost_threshold = m_params.m_qi_eager_threshold;
-
-        if (m_params.m_qi_log_in_filename != "") {
-            SASSERT(m_instance_log_in == 0);
-            m_instance_log_in = new std::ifstream(m_params.m_qi_log_in_filename, std::ios::in);
-            if (!m_instance_log_in->is_open())
-                warning_msg("error opening instance log file '%s', proceeding without", m_params.m_qi_log_in_filename.c_str());
-			if (m_cctx == 0) {
-				m_cctx = alloc(cmd_context, false); //, &m_manager);
-				m_cctx->set_global_decls(false);
-			}
-			else
-				m_cctx->reset(true);
-
-        }
-
-        if (m_params.m_qi_log_out_filename != "") {
-            SASSERT(m_instance_log_out == 0);
-            m_instance_log_out = new std::ofstream(m_params.m_qi_log_out_filename, std::ios::out | std::ios::app);
-            if (!m_instance_log_out->is_open())
-                warning_msg("error opening instance log file '%s', proceeding without", m_params.m_qi_log_out_filename.c_str());
-        }
     }
 
     void qi_queue::init_parser_vars() {
@@ -336,8 +295,8 @@ namespace smt {
         m_stats.m_num_instances++;
         unsigned gen = get_new_gen(q, generation, ent.m_cost);
         display_instance_profile(f, q, num_bindings, bindings, proof_id, gen);
+        m_search_log.log_instance(q, num_bindings, bindings, s_instance, gen, m_scopes.size());
         m_context.internalize_instance(lemma, pr1, gen);
-		add_log_instance(q, num_bindings, bindings, instance, generation);
 
         TRACE_CODE({
             static unsigned num_useless = 0;
@@ -377,16 +336,10 @@ namespace smt {
         s.m_delayed_entries_lim    = m_delayed_entries.size();
         s.m_instances_lim          = m_instances.size();
         s.m_instantiated_trail_lim = m_instantiated_trail.size();
-		add_log_instances(";; ");
-		add_log_marker("push");
-		if (m_cctx)
-			m_cctx->push();
     }
 
     void qi_queue::pop_scope(unsigned num_scopes) {
-		add_log_instances(";; ");
-		if (m_cctx)
-			m_cctx->pop(num_scopes);
+        TRACE("qi_log", tout << "pop " << num_scopes << std::endl;);
         unsigned new_lvl    = m_scopes.size() - num_scopes;
         scope & s           = m_scopes[new_lvl];
         unsigned old_sz     = s.m_instantiated_trail_lim;
@@ -399,248 +352,20 @@ namespace smt {
         m_new_entries.reset();
         m_scopes.shrink(new_lvl);
         TRACE("new_entries_bug", tout << "[qi:pop-scope]\n";);
-		add_log_marker("pop");
     }
 
     void qi_queue::reset() {
-		add_log_instances(";; ");
-		add_log_marker("reset");
-		if (m_cctx)
-			m_cctx->reset(false);
         m_new_entries.reset();
         m_delayed_entries.reset();
         m_instances.reset();
         m_scopes.reset();
     }
 
-	void qi_queue::add_log_marker(char const * name) {
-		if (m_instance_log_out && m_instance_log_out->is_open())
-			(*m_instance_log_out) << ";; (" << name << ") ;; now " << m_scopes.size() << std::endl;
-	}
-
-    void qi_queue::add_log_instance(quantifier * q, unsigned num_bindings, enode * const * bindings, expr_ref instance, unsigned generation) {
-        if (m_instance_log_out && m_instance_log_out->is_open()) {
-            //(*m_instance_log_out) << ";; Q: " << mk_ismt2_pp(q, m_manager, p) << std::endl;
-            //(*m_instance_log_out) << ";; I: " << mk_ismt2_pp(instance, m_manager, p) << std::endl;
-            expr_ref instance(mk_log_instance(q, num_bindings, bindings), m_manager);
-            (*m_instance_log_out) << "(assert " << mk_ismt2_pp(instance, m_manager, m_instance_out_pp_params) << ") ;; gen: " << generation << std::endl;
-        }
-    }
-
-    expr_ref qi_queue::mk_log_instance(quantifier * q, unsigned num_bindings, enode * const * bindings) const {
-        expr_ref_vector eqs(m_manager);
-        for (unsigned i = 0; i < num_bindings; i++) {
-            unsigned vinx = num_bindings - i - 1;
-            sort_ref vsrt(q->get_decl_sort(i), m_manager);
-            var_ref v(m_manager.mk_var(vinx, vsrt), m_manager);
-            expr_ref e(m_manager.mk_eq(v, bindings[i]->get_owner()), m_manager);
-            eqs.push_back(e);
-        }
-        expr_ref body(m_manager.mk_and(num_bindings, eqs.c_ptr()), m_manager);
-        quantifier_ref ex(m_manager.mk_exists(q->get_num_decls(), q->get_decl_sorts(), q->get_decl_names(), body), m_manager);
-        expr_ref qll(m_manager.mk_label(true, q->get_qid(), m_manager.mk_false()), m_manager);
-        expr_ref impl(m_manager.mk_implies(qll, ex), m_manager);
-        return impl;
-    }
-
-    bool qi_queue::is_log_instance(expr const * e, quantifier * & q, unsigned & num_bindings, ptr_vector<enode> & bindings) const {
-        // Instances are represented by terms of the form
-        // (exists ((x ...) ...) (! (and (= ...) (= ...) ...) :lblpos <qid>))
-        if (m_manager.is_implies(e)) {
-            expr * lit = to_app(e)->get_arg(0);
-            expr * qe = to_app(e)->get_arg(1);
-            buffer<symbol> names;
-            bool pos;
-            expr * lbl;
-            if (m_manager.is_label(lit, pos, names, lbl) &&
-                pos && names.size() == 1 && m_manager.is_false(lbl) &&
-                is_quantifier(qe)) {
-                quantifier const * iq = to_quantifier(qe);
-                symbol qid = symbol::mk_symbol_from_numerical_string(names[0].str());
-                unsigned iq_num_decls = iq->get_num_decls();
-                expr * pq_body = iq->get_expr();
-                sort * const * iq_sorts = iq->get_decl_sorts();
-                if (pq_body->get_kind() != AST_APP)
-                    return false;
-                if (m_qm.find(qid, q)) {
-                    sort * const * q_sorts = q->get_decl_sorts();
-                    if (iq_num_decls != q->get_num_decls())
-                        return false;
-                    for (unsigned i = 0; i < iq_num_decls; i++)
-                        if (iq_sorts[i] != q_sorts[i])
-                            return false;
-                    if (!m_manager.is_and(pq_body))
-                        return false;
-                    app * a_body = to_app(pq_body);
-                    num_bindings = a_body->get_num_args();
-                    for (unsigned i = 0; i < num_bindings; i++) {
-                        expr * ai = a_body->get_arg(i);
-                        if (!m_manager.is_eq(ai))
-                            return false;
-                        app * aai = to_app(ai);
-                        if (aai->get_num_args() != 2)
-                            return false;
-                        expr * var = aai->get_arg(0);
-                        expr * val = aai->get_arg(1);
-                        if (var->get_kind() != AST_VAR ||
-                            to_var(var)->get_idx() != (iq_num_decls - i - 1) ||
-                            !is_ground(val))
-                            return false;
-                        context & ctx = m_qm.get_context();
-                        if (!ctx.b_internalized(val) && !ctx.e_internalized(val))
-                            ctx.internalize(val, false);
-                        bindings.push_back(ctx.find_enode(val));
-                    }
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    void qi_queue::setup_instance_log_parser() {
-        // CMW: Do we need to register/load builtin names of the manager's
-        // plugins in the cmd_context's m_plugins?
-        //for (decl_plugin * const * it = m_manager.begin_plugins();
-        //    it != m_manager.end_plugins();
-        //    it++) {
-        //    decl_plugin * dp = *it;
-        //    cctx->register_plugin(m_manager.get_family_name(dp->get_family_id()), dp, true);
-        //}
-
-        //ast_table::iterator it = m_manager.begin_asts();
-        //ast_table::iterator end = m_manager.end_asts();
-        //for (; it != end; it++)
-        //{
-        //    ast * a = *it;
-        //    switch (a->get_kind()) {
-        //    case AST_FUNC_DECL: {
-        //        func_decl * decl = to_func_decl(a);
-        //        const symbol & name = decl->get_name();
-        //        if (!cctx->is_func_decl(name)) {
-        //            cctx->insert(decl);
-        //        }
-        //        break;
-        //    }
-        //    case AST_SORT: {
-        //        sort * srt = to_sort(a);
-        //        symbol const & name = srt->get_name();
-        //        if (!cctx->is_sort_decl(name)) {
-        //            psort * ps = cctx->pm().mk_psort_cnst(srt);
-        //            cctx->insert(cctx->pm().mk_psort_user_decl(0, name, ps));
-        //        }
-        //        break;
-        //    }
-        //    case AST_VAR:
-        //    case AST_QUANTIFIER:
-        //    default: ;
-        //    }
-        //}
-
-		ptr_vector<enode>::const_iterator it = m_context.begin_enodes();
-		ptr_vector<enode>::const_iterator end = m_context.end_enodes();
-		for (; it != end; it++) {
-			 enode * e = *it;
-
-			 enode const * cur = e;
-			 do {
-				 SASSERT(cur->get_root() == e->get_root());
-				 app * owner = cur->get_owner();
-				 func_decl * fd = owner->get_decl();
-				 symbol const & fdname = fd->get_name();
-				 sort * s = fd->get_range();
-				 symbol const & sname = s->get_name();
-
-				 if (!m_cctx->is_func_decl(fdname))
-					 m_cctx->insert(fd);
-
-				 if (!m_cctx->is_sort_decl(sname)) {
-					 psort * ps = m_cctx->pm().mk_psort_cnst(s);
-					 m_cctx->insert(m_cctx->pm().mk_psort_user_decl(0, sname, ps));
-				 }
-
-				 for (unsigned i = 0; i < fd->get_arity(); i++) {
-					 sort * di = fd->get_domain(i);
-					 symbol const & snamei = di->get_name();
-					 if (!m_cctx->is_sort_decl(snamei)) {
-						 psort * ps = m_cctx->pm().mk_psort_cnst(di);
-						 m_cctx->insert(m_cctx->pm().mk_psort_user_decl(0, snamei, ps));
-					 }
-				 }
-
-				 cur = cur->get_next();
-			 } while (cur != e);
-		}
-
-		m_cctx->reset_assertions();
-    }
-
-    void qi_queue::add_log_instances(std::string marker) {
-        if (m_instance_log_in && m_instance_log_in->is_open() && !m_manager.proofs_enabled()) {
-			setup_instance_log_parser();
-
-            unsigned num_before = m_stats.m_num_replayed_instances;
-            std::string line = "";
-            while (std::getline(*m_instance_log_in, line) &&
-				   line.substr(0, marker.length()).compare(marker) != 0)
-            {
-				//std::cout << "line: " << line << std::endl;
-                std::stringstream sl(line);
-                parse_smt2_commands(*m_cctx, sl);
-            }
-
-			std::cout << "marker: " << line << std::endl;
-
-            expr * const * it = m_cctx->begin_assertions();
-            expr * const * end = m_cctx->end_assertions();
-            for (; it != end; it++) {
-                expr * e = *it;
-                quantifier * q;
-                unsigned num_bindings;
-                ptr_vector<enode> bindings;
-                if (is_log_instance(e, q, num_bindings, bindings)) {
-                    if (!m_qm.add_instance(q, num_bindings, bindings.c_ptr())) {
-						IF_VERBOSE(12, verbose_stream() << "(smt.qi.log :redundant-instance-of " <<
-							q->get_qid() << ")" << std::endl; );
-                    }
-                    else {
-                        IF_VERBOSE(12, verbose_stream() << "(smt.qi.log :instance-of " <<
-                            q->get_qid() << ")" << std::endl; );
-                        m_stats.m_num_replayed_instances++;
-                    }
-                }
-                else {
-                    std::stringstream ss;
-                    ss << mk_ismt2_pp(e, m_manager) << std::endl;
-                    warning_msg("ignoring invalid quantifier instance: %s", ss.str().c_str());
-                }
-            }
-            m_instance_log_in->clear(); // clears only the stream flags.
-			unsigned num_inst = m_stats.m_num_replayed_instances - num_before;
-            IF_VERBOSE(11, verbose_stream() << "(smt.qi.log :num-replayed-instances " << num_inst << " :level " << m_context.get_scope_level() << ")" << std::endl;);
-
-            // Instantiate all logged instances (without log disabled).
-            std::ofstream * t = 0;
-            std::swap(m_instance_log_out, t);
-            for (svector<entry>::iterator it = m_new_entries.begin();
-                it != m_new_entries.end();
-                it++) {
-                instantiate(*it);
-            }
-            std::swap(m_instance_log_out, t);
-
-            IF_VERBOSE(11, verbose_stream() << "(smt.qi.log :num-instances " << m_stats.m_num_instances << ")" << std::endl;);
-        }
-    }
-
     void qi_queue::init_search_eh() {
         m_subst.reset();
+    }
 
-		add_log_instances(";; (init-search-marker)");
-
-		if (!m_instance_log_first_check)
-			add_log_marker("init-search-marker");
-		m_instance_log_first_check = false;
+    void qi_queue::end_search_eh() {
     }
 
     bool qi_queue::final_check_eh() {
@@ -757,7 +482,6 @@ namespace smt {
         st.update("quant instantiations", m_stats.m_num_instances);
         st.update("lazy quant instantiations", m_stats.m_num_lazy_instances);
         st.update("missed quant instantiations", m_delayed_entries.size());
-        st.update("replayed instantiations", m_stats.m_num_replayed_instances);
         float min, max;
         get_min_max_costs(min, max);
         st.update("min missed qa cost", min);

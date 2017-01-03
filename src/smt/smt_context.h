@@ -36,6 +36,7 @@ Revision History:
 #include"smt_case_split_queue.h"
 #include"smt_almost_cg_table.h"
 #include"smt_failure.h"
+#include"smt_search_log.h"
 #include"asserted_formulas.h"
 #include"smt_types.h"
 #include"dyn_ack.h"
@@ -209,7 +210,7 @@ namespace smt {
             ~scoped_mk_model() {
                 if (m_ctx.m_proto_model.get() != 0) {
                     m_ctx.m_model = m_ctx.m_proto_model->mk_model();
-                    m_ctx.add_rec_funs_to_model();            
+                    m_ctx.add_rec_funs_to_model();
                     m_ctx.m_proto_model = 0; // proto_model is not needed anymore.
                 }
             }
@@ -598,9 +599,9 @@ namespace smt {
         svector<scope>              m_scopes;
         svector<base_scope>         m_base_scopes;
 
-        void push_scope();
+        void push_scope(bool log = true);
 
-        unsigned pop_scope_core(unsigned num_scopes);
+        unsigned pop_scope_core(unsigned num_scopes, bool log = true);
 
         void pop_scope(unsigned num_scopes);
 
@@ -1568,6 +1569,16 @@ namespace smt {
         func_decl * get_macro_interpretation(unsigned i, expr_ref & interp) const { return m_asserted_formulas.get_macro_interpretation(i, interp); }
         quantifier * get_macro_quantifier(func_decl * f) const { return m_asserted_formulas.get_macro_quantifier(f); }
         void insert_macro(func_decl * f, quantifier * m, proof * pr) { m_asserted_formulas.insert_macro(f, m, pr); }
+
+        // -----------------------------------
+        //
+        // Search logs
+        //
+        // -----------------------------------
+    public:
+        search_log                 m_search_log;
+
+        quantifier_manager & get_qmanager(void) const { return *m_qmanager.get(); }
     };
 };
 

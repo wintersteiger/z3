@@ -1776,6 +1776,16 @@ void cmd_context::display_smt2_benchmark(std::ostream & out, unsigned num, expr 
     out << "(check-sat)" << std::endl;
 }
 
+void cmd_context::set_global_decls_unsafe(bool flag) {
+    // CMW: I believe this is safe, even when has_manager() == true.
+    // When m_global_decls goes low, the previously added decls will
+    // never be backtracked because they aren't in m_func_decls_stack,
+    // and vice versa. I use this to switch from m_global_decls == false
+    // to m_global_decls == true for declarations that are generated
+    // internally during the search in smt_context.
+    m_global_decls = flag;
+}
+
 void cmd_context::slow_progress_sample() {
     SASSERT(m_solver);
     statistics st;

@@ -45,7 +45,11 @@ namespace smt {
         void add(quantifier * q, unsigned generation);
         void del(quantifier * q);
         bool empty() const;
-        bool find(symbol const & qid, quantifier * & q) const;
+
+        bool find(unsigned lqid, quantifier * & q) const;
+        unsigned get_lqid(quantifier * q) const;
+        void assign_lqid(quantifier * q);
+        void unassign_lqid(quantifier * q);
 
         bool is_shared(enode * n) const;
 
@@ -62,6 +66,7 @@ namespace smt {
         bool add_instance(quantifier * q, unsigned num_bindings, enode * const * bindings, unsigned generation = 0);
 
         void init_search_eh();
+        void end_search_eh();
         void assign_eh(quantifier * q);
         void add_eq_eh(enode * n1, enode * n2);
         void relevant_eh(enode * n);
@@ -126,6 +131,10 @@ namespace smt {
            \brief This method is invoked when a new search() is started.
         */
         virtual void init_search_eh() = 0;
+        /**
+        \brief This method is invoked when a a search ends.
+        */
+        virtual void end_search_eh() = 0;
         /**
            \brief Final_check event handler.
         */

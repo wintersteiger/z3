@@ -268,8 +268,8 @@ public:
     ~cmd_context();
     void set_cancel(bool f);
     context_params  & params() { return m_params; }
-    solver_factory &get_solver_factory() { return *m_solver_factory; }
-    solver_factory &get_interpolating_solver_factory() { return *m_interpolating_solver_factory; }
+    solver_factory & get_solver_factory() { return *m_solver_factory; }
+    solver_factory & get_interpolating_solver_factory() { return *m_interpolating_solver_factory; }
     opt_wrapper*  get_opt();
     void          set_opt(opt_wrapper* o);
     void global_params_updated(); // this method should be invoked when global (and module) params are updated.
@@ -290,6 +290,7 @@ public:
     void print_unsupported(symbol const & s, int line, int pos) { print_unsupported_msg(); print_unsupported_info(s, line, pos); }
     bool global_decls() const { return m_global_decls; }
     void set_global_decls(bool flag) { SASSERT(!has_manager()); m_global_decls = flag; }
+    void set_global_decls_unsafe(bool flag);
     unsigned random_seed() const { return m_random_seed; }
     void set_random_seed(unsigned s) { m_random_seed = s; }
     bool produce_models() const;
@@ -326,7 +327,8 @@ public:
 
     void register_plugin(symbol const & name, decl_plugin * p, bool install_names);
     bool is_func_decl(symbol const & s) const;
-    bool is_sort_decl(symbol const& s) const { return m_psort_decls.contains(s); }
+    bool is_sort_decl(symbol const & s) const { return m_psort_decls.contains(s); }
+    bool is_macro(symbol const & s) const { return m_macros.contains(s); }
     void insert(cmd * c);
     void insert(symbol const & s, func_decl * f);
     void insert(func_decl * f) { insert(f->get_name(), f); }
@@ -439,6 +441,8 @@ public:
 
     virtual void slow_progress_sample();
     virtual void fast_progress_sample();
+
+    friend class replay_cmd_context;
 };
 
 std::ostream & operator<<(std::ostream & out, cmd_context::status st);

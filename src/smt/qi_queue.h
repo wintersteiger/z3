@@ -25,6 +25,7 @@ Revision History:
 #include"smt_quantifier_stat.h"
 #include"smt_checker.h"
 #include"smt_quantifier.h"
+#include"smt_search_log.h"
 #include"qi_params.h"
 #include"fingerprints.h"
 #include"cost_parser.h"
@@ -36,7 +37,7 @@ namespace smt {
     class context;
 
     struct qi_queue_stats {
-        unsigned m_num_instances, m_num_lazy_instances, m_num_replayed_instances;
+        unsigned m_num_instances, m_num_lazy_instances;
         void reset() { memset(this, 0, sizeof(qi_queue_stats)); }
         qi_queue_stats() { reset(); }
     };
@@ -72,10 +73,7 @@ namespace smt {
             unsigned   m_instantiated_trail_lim;
         };
         svector<scope>                m_scopes;
-        std::ifstream *               m_instance_log_in;
-        std::ofstream *               m_instance_log_out;
-        bool                          m_instance_log_first_check;
-        params_ref                    m_instance_out_pp_params;
+        search_log                  & m_search_log;
 
         void init_parser_vars();
         quantifier_stat * set_values(quantifier * q, app * pat, unsigned generation, unsigned min_top_generation, unsigned max_top_generation, float cost);
@@ -97,20 +95,13 @@ namespace smt {
         void instantiate();
         bool has_work() const { return !m_new_entries.empty(); }
         void init_search_eh();
+        void end_search_eh();
         bool final_check_eh();
         void push_scope();
         void pop_scope(unsigned num_scopes);
         void reset();
         void display_delayed_instances_stats(std::ostream & out) const;
         void collect_statistics(::statistics & st) const;
-
-        void setup_instance_log_parser();
-		void add_log_marker(char const * marker);
-        void add_log_instance(quantifier * q, unsigned num_bindings, enode * const * bindings, expr_ref instance, unsigned generation);
-        void add_log_instances(std::string marker);
-        expr_ref mk_log_instance(quantifier * q, unsigned num_bindings, enode * const * bindings) const;
-        bool is_log_instance(expr const * e, quantifier * & q, unsigned & num_bindings, ptr_vector<enode> & bindings) const;
-		cmd_context * m_cctx;
     };
 };
 

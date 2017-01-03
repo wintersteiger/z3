@@ -212,6 +212,11 @@ public:
         return l_undef;
     }
 
+    virtual bool add_quantifier_instance(expr_ref const & instance) {
+        m_ignore_solver1 = true;
+        return m_solver2->add_quantifier_instance(instance);
+    }
+
     virtual lbool check_sat(unsigned num_assumptions, expr * const * assumptions) {
         m_check_sat_executed  = true;
         m_use_solver1_results = false;

@@ -135,42 +135,45 @@ public:
     virtual expr * get_assertion(unsigned idx) const;
 
     /**
-    \brief Retrieves assertions as a vector.
+        \brief Retrieves assertions as a vector.
     */
     void get_assertions(expr_ref_vector& fmls) const;
 
     /**
-    \brief The number of tracked assumptions (see assert_expr(t, a)).
+        \brief The number of tracked assumptions (see assert_expr(t, a)).
     */
     virtual unsigned get_num_assumptions() const = 0;
 
     /**
-    \brief Retrieves the idx'th tracked assumption (see assert_expr(t, a)).
+        \brief Retrieves the idx'th tracked assumption (see assert_expr(t, a)).
     */
     virtual expr * get_assumption(unsigned idx) const = 0;
 
     /**
-    \brief under assumptions, asms, retrieve set of consequences that
-      fix values for expressions that can be built from vars.
-      The consequences are clauses whose first literal constrain one of the
-      functions from vars and the other literals are negations of literals from asms.
+        \brief under assumptions, asms, retrieve set of consequences that
+        fix values for expressions that can be built from vars.
+        The consequences are clauses whose first literal constrain one of the
+        functions from vars and the other literals are negations of literals from asms.
     */
+    virtual lbool get_consequences(expr_ref_vector const & asms, expr_ref_vector const & vars, expr_ref_vector & consequences);
 
-    virtual lbool get_consequences(expr_ref_vector const& asms, expr_ref_vector const& vars, expr_ref_vector& consequences);
-
+    /**
+        \brief Adds a quantifier instance describe by a solver-specific expression.
+    */
+    virtual bool add_quantifier_instance(expr_ref const & i) { return false; }
 
     /**
        \brief Find maximal subsets A' of A such that |A'| <= 1. These subsets look somewhat similar to cores: cores have the property
        that |~A'| >= 1, where ~A' is the set of negated formulas from A'
      */
 
-    virtual lbool find_mutexes(expr_ref_vector const& vars, vector<expr_ref_vector>& mutexes);
+    virtual lbool find_mutexes(expr_ref_vector const & vars, vector<expr_ref_vector> & mutexes);
 
     /**
        \brief Preferential SAT. Prefer assumptions to be true, produce cores that witness cases when not all assumptions can be met.
        by default, preferred sat ignores the assumptions.
      */
-    virtual lbool preferred_sat(expr_ref_vector const& asms, vector<expr_ref_vector>& cores);
+    virtual lbool preferred_sat(expr_ref_vector const & asms, vector<expr_ref_vector> & cores);
 
     /**
        \brief Display the content of this solver.
