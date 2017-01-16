@@ -38,6 +38,7 @@ Notes:
 #include"progress_callback.h"
 #include"scoped_ptr_vector.h"
 #include"context_params.h"
+#include"async_manager.h"
 
 
 class func_decls {
@@ -128,7 +129,10 @@ public:
     virtual void updt_params(params_ref const& p) = 0;
 };
 
-class cmd_context : public progress_callback, public tactic_manager, public ast_printer_context {
+class cmd_context : public progress_callback,
+                    public tactic_manager,
+                    public ast_printer_context,
+                    public async_manager {
 public:
     enum status {
         UNSAT, SAT, UNKNOWN
@@ -269,10 +273,12 @@ public:
     ~cmd_context(); 
     void set_cancel(bool f);
     context_params  & params() { return m_params; }
-    solver_factory &get_solver_factory() { return *m_solver_factory; }
-    solver_factory &get_interpolating_solver_factory() { return *m_interpolating_solver_factory; }
-    opt_wrapper*  get_opt();
-    void          set_opt(opt_wrapper* o);
+    bool has_solver() const { return m_solver.get() != 0; }
+    solver & get_solver() const { SASSERT(has_solver()); return *m_solver.get(); }
+    solver_factory & get_solver_factory() { return *m_solver_factory; }
+    solver_factory & get_interpolating_solver_factory() { return *m_interpolating_solver_factory; }
+    opt_wrapper * get_opt();
+    void set_opt(opt_wrapper* o);
     void global_params_updated(); // this method should be invoked when global (and module) params are updated.
     bool set_logic(symbol const & s);
     bool has_logic() const { return m_logic != symbol::null; }

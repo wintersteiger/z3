@@ -30,6 +30,7 @@ Revision History:
 #include"polynomial_cmds.h"
 #include"subpaving_cmds.h"
 #include"smt2_extra_cmds.h"
+#include"async_cmds.h"
 #include"smt_strategic_solver.h"
 #include"smt_solver.h"
 
@@ -115,6 +116,7 @@ unsigned read_smtlib2_commands(char const * file_name) {
     install_subpaving_cmds(ctx);
     install_opt_cmds(ctx);
     install_smt2_extra_cmds(ctx);
+    install_async_cmds(ctx);
 
     g_cmd_context = &ctx;
     signal(SIGINT, on_ctrl_c);
