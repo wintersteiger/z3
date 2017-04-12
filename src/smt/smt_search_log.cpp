@@ -115,7 +115,7 @@ namespace smt {
                                   expr_ref instance,
                                   unsigned generation, unsigned scope) {
         TRACE("qi_log_instance_detail",
-            tout << "Quantifier (lqid=" << m_qmanager.get_lqid(q) << "): " << std::endl;
+            tout << "Quantifier (lqid=" << m_qmanager.get_qid(q) << "): " << std::endl;
             tout << mk_ismt2_pp(q, m) << std::endl;
             tout << "Bindings: " << std::endl;
             for (unsigned i = 0; i < num_bindings; i++)
@@ -124,7 +124,7 @@ namespace smt {
             tout << mk_ismt2_pp(instance, m) << std::endl; );
 
         TRACE("qi_log_instance_short",
-            tout << "Instantiate lqid=" << m_qmanager.get_lqid(q) << " with: " << std::endl;
+            tout << "Instantiate lqid=" << m_qmanager.get_qid(q) << " with: " << std::endl;
             for (unsigned i = 0; i < num_bindings; i++)
                 tout << mk_ismt2_pp(bindings[i]->get_owner(), m) << std::endl; );
 
@@ -171,11 +171,10 @@ namespace smt {
                 sort * const * iq_sorts = iq->get_decl_sorts();
                 if (pq_body->get_kind() != AST_APP)
                     return false;
-                symbol lqids = symbol::mk_symbol_from_numerical_string(names[0].str());
-                unsigned lqid = lqids.get_num();
 
-                if (!m_qmanager.find(lqid, q)) {
-                    warning_msg("quantifier with lqid '%d' not found; ignoring instance", lqid);
+                symbol qid = names[0];
+                if (!m_qmanager.find(qid, q)) {
+                    warning_msg("quantifier with qid '%s' not found; ignoring instance", qid.str().c_str());
                     return false;
                 }
                 else {
@@ -261,7 +260,6 @@ namespace smt {
             eqs.push_back(e);
         }
         expr_ref body(m.mk_and(num_bindings, eqs.c_ptr()), m);
-        // symbol const * names = q->get_decl_names();
         vector<symbol> names(num_bindings);
         for (unsigned i = 0; i < num_bindings; i++) {
             std::stringstream ss;
@@ -269,8 +267,8 @@ namespace smt {
             names[i] = symbol(ss.str().c_str());
         }
         quantifier_ref ex(m.mk_exists(q->get_num_decls(), q->get_decl_sorts(), names.c_ptr(), body), m);
-        symbol lqids(m_qmanager.get_lqid(q));
-        expr_ref qll(m.mk_label(true, lqids, m.mk_false()), m);
+        symbol qid(m_qmanager.get_qid(q));
+        expr_ref qll(m.mk_label(true, qid, m.mk_false()), m);
         expr_ref impl(m.mk_implies(qll, ex), m);
         return impl;
     }

@@ -42,9 +42,13 @@ namespace smt {
         scoped_ptr<quantifier_manager_plugin>  m_plugin;
         unsigned                               m_num_instances;
 
+        typedef map<symbol, ptr_vector<quantifier> *, symbol_hash_proc, symbol_eq_proc> qid2qs_map;
+        typedef obj_map<quantifier, symbol> q2qid_map;
+        typedef obj_map<quantifier, unsigned> q2lqid_map;
+        qid2qs_map                             m_qid2qs;
+        q2qid_map                              m_q2qid;
         id_gen                                 m_lqids;
-        u_map<quantifier *>                    m_lqid2q;
-        obj_map<quantifier, unsigned>          m_q2lqid;
+        q2lqid_map                             m_q2lqid;
 
         imp(quantifier_manager & wrapper, context & ctx, smt_params & p, quantifier_manager_plugin * plugin) :
             m_wrapper(wrapper),
@@ -58,7 +62,8 @@ namespace smt {
         }
 
         ~imp() {
-            dec_ref_values(m_context.get_manager(), m_lqid2q);
+            for (qid2qs_map::iterator it = m_qid2qs.begin(); it != m_qid2qs.end(); it++)
+                dealloc(it->m_value);
         }
 
         ast_manager& m() const { return m_context.get_manager(); }
@@ -74,8 +79,8 @@ namespace smt {
         }
 
         void add(quantifier * q, unsigned generation) {
-            assign_lqid(q);
-            TRACE("add_quantifier", tout << "New quantifier '" << q->get_qid() << "' (gen " << generation << ", lqid=" << get_lqid(q) << "): " << mk_ismt2_pp(q, m_context.get_manager()) << std::endl;);
+            assign_qid(q);
+            TRACE("add_quantifier", tout << "New quantifier '" << get_qid(q) << "' (gen " << generation << "): " << mk_ismt2_pp(q, m_context.get_manager()) << std::endl;);
             ast_manager & m = m_context.get_manager();
             quantifier_stat * stat = m_qstat_gen(q, generation);
             m_quantifier_stat.insert(q, stat);
@@ -84,45 +89,88 @@ namespace smt {
             m_plugin->add(q);
         }
 
-        bool find(unsigned lqid, quantifier * & q) const {
-            return m_lqid2q.find(lqid, q);
+        bool find(symbol const & qid, quantifier * & q) const {
+            ptr_vector<quantifier> * qs;
+            if (!m_qid2qs.find(qid, qs))
+                return false;
+            else
+                if (qs->size() == 0)
+                    return false;
+                else {
+                    q = qs->get(0);
+                    return true;
+                }
         }
 
-        unsigned get_lqid(quantifier * q) const {
-            SASSERT(m_q2lqid.contains(q));
-            return m_q2lqid.find(q);
+        symbol const & get_qid(quantifier * q) const {
+            SASSERT(m_q2qid.contains(q));
+            return m_q2qid.find(q);
         }
 
-        void assign_lqid(quantifier * q) {
+        void assign_qid(quantifier * q) {
             ast_manager & m = m_context.get_manager();
+
+            symbol qid = q->get_qid();
+            if (qid == symbol::null || qid.is_numerical()) {
+                unsigned lqid;
+                if (m_q2lqid.find(q, lqid)) {
+                    qid = symbol(lqid);
+
+                    DEBUG_CODE({
+                        ptr_vector<quantifier> * qs;
+                        SASSERT(m_qid2qs.find(qid, qs));
+                        SASSERT(qs->size() == 1);
+                        SASSERT(m_q2qid.find(qs->get(0)) == qid);
+                        SASSERT(m_qid2qs.contains(qid));
+                        SASSERT(m_qid2qs.find(qid)->contains(q));
+                    });
+
+                    return;
+                }
+                else {
+                    lqid = m_lqids.mk();
+                    std::stringstream sstr;
+                    sstr << "lqid!";
+                    if (qid.is_numerical())
+                        sstr << "line-" << qid.get_num() << "!";
+                    sstr << lqid;
+                    qid = symbol(sstr.str().c_str());
+                    TRACE("qi_log_instance_detail",
+                        tout << "Assigning quantifier lqid=" << lqid << std::endl;
+                    tout << mk_ismt2_pp(q, m) << std::endl; );
+                    m_q2lqid.insert(q, lqid);
+                }
+            }
+
+            ptr_vector<quantifier> * qs;
+            if (!m_qid2qs.find(qid, qs)) {
+                qs = alloc(ptr_vector<quantifier>);
+                m_qid2qs.insert(qid, qs);
+            }
+            if (!qs->contains(q))
+                qs->push_back(q);
+
+            m_q2qid.insert(q, qid);
+        }
+
+        void unassign_qid(quantifier * q) {
+            ast_manager & m = m_context.get_manager();
+            symbol const & qid = get_qid(q);
+            TRACE("qi_log_instance_detail", tout << "Unassign quantifier " << qid << std::endl; );
+
             unsigned lqid;
             if (m_q2lqid.find(q, lqid)) {
-                DEBUG_CODE({
-                    quantifier * k;
-                    SASSERT(m_lqid2q.find(lqid, k));
-                    SASSERT(k == q);
-                });
+                m_q2lqid.erase(q);
+                m_lqids.recycle(lqid);
             }
-            else {
-                lqid = m_lqids.mk();
-                TRACE("qi_log_instance_detail",
-                    tout << "Assign quantifier #" << lqid << std::endl;
-                    tout << mk_ismt2_pp(q, m) << std::endl; );
-                m.inc_ref(q);
-                m_lqid2q.insert(lqid, q);
-                m_q2lqid.insert(q, lqid);
-            }
-        }
 
-        void unassign_lqid(quantifier * q) {
-            ast_manager & m = m_context.get_manager();
-            unsigned lqid = m_q2lqid.find(q);
-            TRACE("qi_log_instance_detail", tout << "Unassign quantifier #" << lqid << std::endl; );
-            m.dec_ref(q);
-            m_lqid2q.erase(lqid);
-            m_q2lqid.erase(q);
-            m_lqids.recycle(lqid);
+            ptr_vector<quantifier> * qs = m_qid2qs.find(qid);
+            SASSERT(qs != 0);
+            qs->erase(q);
+            if (qs->empty())
+                m_qid2qs.erase(qid);
 
+            m_q2qid.erase(q);
         }
 
         void display_stats(std::ostream & out, quantifier * q) {
@@ -150,7 +198,7 @@ namespace smt {
             m_context.get_manager().dec_ref(m_quantifiers.back());
             m_quantifiers.pop_back();
             m_quantifier_stat.erase(q);
-            unassign_lqid(q);
+            unassign_qid(q);
         }
 
         bool empty() const {
@@ -354,20 +402,20 @@ namespace smt {
         m_imp->del(q);
     }
 
-    bool quantifier_manager::find(unsigned lqid, quantifier * & q) const {
-        return m_imp->find(lqid, q);
+    bool quantifier_manager::find(symbol const & qid, quantifier * & q) const {
+        return m_imp->find(qid, q);
     }
 
-    unsigned quantifier_manager::get_lqid(quantifier * q) const {
-        return m_imp->get_lqid(q);
+    symbol const & quantifier_manager::get_qid(quantifier * q) const {
+        return m_imp->get_qid(q);
     }
 
-    void quantifier_manager::assign_lqid(quantifier * q) {
-        m_imp->assign_lqid(q);
+    void quantifier_manager::assign_qid(quantifier * q) {
+        m_imp->assign_qid(q);
     }
 
-    void quantifier_manager::unassign_lqid(quantifier * q) {
-        m_imp->unassign_lqid(q);
+    void quantifier_manager::unassign_qid(quantifier * q) {
+        m_imp->unassign_qid(q);
     }
 
     bool quantifier_manager::empty() const {

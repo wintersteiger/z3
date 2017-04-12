@@ -46,10 +46,10 @@ namespace smt {
         void del(quantifier * q);
         bool empty() const;
 
-        bool find(unsigned lqid, quantifier * & q) const;
-        unsigned get_lqid(quantifier * q) const;
-        void assign_lqid(quantifier * q);
-        void unassign_lqid(quantifier * q);
+        bool find(symbol const & qid, quantifier * & q) const;
+        symbol const & get_qid(quantifier * q) const;
+        void assign_qid(quantifier * q);
+        void unassign_qid(quantifier * q);
 
         bool is_shared(enode * n) const;
 
@@ -177,7 +177,7 @@ namespace smt {
         virtual void push() = 0;
         virtual void pop(unsigned num_scopes) = 0;
 
-        
+
 
     };
 };
