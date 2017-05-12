@@ -96,9 +96,10 @@ public:
 
 class decide_cmd : public cmd {
     expr * m_decision;
+    bool   m_ignore;
 
 public:
-    decide_cmd() : cmd("decide"), m_decision(0) {}
+    decide_cmd(bool ignore) : cmd("decide"), m_decision(0), m_ignore(ignore) {}
     virtual char const * get_usage() const { return "<term>"; }
     virtual char const * get_descr(cmd_context & ctx) const { return "add a decision"; }
     virtual unsigned get_arity() const { return 1; }
@@ -117,8 +118,12 @@ public:
         nasty_hack * hacked_ctx = reinterpret_cast<nasty_hack*>(&ctx);
         ref<solver> slvr = hacked_ctx->get_solver();
         SASSERT(slvr);
-        ctx.push();                    // decisions include 1 push, so that the
-        slvr->assert_expr(m_decision); // assertion will be backtracked if it's wrong.
+
+        // Decisions include 1 push, so that the assertion will be 
+        // backtracked if it's wrong (at the next lemma cmd).
+        ctx.push();
+        if (!m_ignore)
+            slvr->assert_expr(m_decision); 
     }
     virtual void prepare(cmd_context & ctx) { reset(ctx); }
     virtual void reset(cmd_context& ctx) {
@@ -132,11 +137,11 @@ public:
 
 class lemma_cmd : public cmd {
     expr       * m_lemma;
-    params_ref   m_params;
     unsigned     m_levels;
+    bool         m_ignore;
 
 public:
-    lemma_cmd() : cmd("lemma"), m_lemma(0), m_levels(UINT_MAX) { }
+    lemma_cmd(bool ignore) : cmd("lemma"), m_lemma(0), m_levels(UINT_MAX), m_ignore(ignore) { }
     virtual char const * get_usage() const { return "<number> <term>"; }
     virtual char const * get_descr(cmd_context & ctx) const { return "backtrack <number> levels and add a (checked) lemma"; }
     virtual unsigned get_arity() const { return 2; }
@@ -163,40 +168,45 @@ public:
         ref<solver> slvr = hacked_ctx->get_solver();
         SASSERT(slvr);
         SASSERT(m_lemma);
-
-        expr_ref not_lemma(m.mk_not(m_lemma), m);
-        slvr->push();
-        slvr->assert_expr(not_lemma);
-
-        lbool s = slvr->check_sat(0, 0);
-
-        slvr->pop(m_levels + 1);
-        // TODO: Check that lemma depends on things on the current level?
-
-        DEBUG_CODE({
-            statistics st;
-            slvr->collect_statistics(st);
-            TRACE("replay_stats", st.display(tout); );
-        });
-
-        switch (s) {
-        case l_false: {
-            slvr->assert_expr(m_lemma);
-            break;
+        
+        if (m_ignore) {
+            slvr->pop(m_levels);
         }
-        case l_true: {
-            std::stringstream strs;
-            strs << mk_ismt2_pp(m_lemma, m);
-            warning_msg("ignoring erroneous lemma: %s", strs.str().c_str());
-            break;
-        }
-        case l_undef:
-        default: {
-            std::stringstream strs;
-            strs << mk_ismt2_pp(m_lemma, m);
-            warning_msg("could not prove lemma: %s %s", strs.str().c_str(), slvr->reason_unknown().c_str());
-            break;
-        }
+        else {
+            expr_ref not_lemma(m.mk_not(m_lemma), m);
+            slvr->push();
+            slvr->assert_expr(not_lemma);
+
+            lbool s = slvr->check_sat(0, 0);
+
+            slvr->pop(m_levels + 1);
+            // TODO: Check that lemma depends on things on the current level?
+
+            DEBUG_CODE({
+                statistics st;
+                slvr->collect_statistics(st);
+                TRACE("replay_stats", st.display(tout); );
+            });
+
+            switch (s) {
+            case l_false: {
+                slvr->assert_expr(m_lemma);
+                break;
+            }
+            case l_true: {
+                std::stringstream strs;
+                strs << mk_ismt2_pp(m_lemma, m);
+                warning_msg("ignoring erroneous lemma: %s", strs.str().c_str());
+                break;
+            }
+            case l_undef:
+            default: {
+                std::stringstream strs;
+                strs << mk_ismt2_pp(m_lemma, m);
+                warning_msg("could not prove lemma: %s %s", strs.str().c_str(), slvr->reason_unknown().c_str());
+                break;
+            }
+            }
         }
     }
     virtual void prepare(cmd_context & ctx) { reset(ctx); }
@@ -218,7 +228,9 @@ class replay_cmd : public cmd {
 
     bool               m_global_decls_before;
     context_params     m_ctx_params_before;
-    params_ref         m_gparams_before;
+    std::string        m_auto_config_before;
+    std::string        m_mbqi_before;
+    std::string        m_ematching_before;
 
 public:
     replay_cmd() : cmd("replay"), m_log_filename("") {}
@@ -261,16 +273,25 @@ protected:
     }
 
     void setup_env(cmd_context & ctx) {
+        bool ignore_decisions = gparams::get_value("smt.search_log.replay.ignore_decisions") == "true";
+        bool ignore_lemmas = gparams::get_value("smt.search_log.replay.ignore_lemmas") == "true";
+        
         ctx.m().new_func_decl_eh = &new_func_decl_eh;
         ctx.m().erase_func_decl_eh = &erase_func_decl_eh;
 
         ctx.insert(m_add_instance_cmd = alloc(add_instance_cmd));
-        ctx.insert(m_decide_cmd = alloc(decide_cmd));
-        ctx.insert(m_lemma_cmd = alloc(lemma_cmd));
+        ctx.insert(m_decide_cmd = alloc(decide_cmd, ignore_decisions));
+        ctx.insert(m_lemma_cmd = alloc(lemma_cmd, ignore_lemmas));
 
         m_ctx_params_before = ctx.params();
         m_global_decls_before = ctx.global_decls();
-        m_gparams_before = gparams::get();
+        m_auto_config_before = gparams::get_value("auto-config");
+        m_mbqi_before = gparams::get_value("smt.mbqi");
+        m_ematching_before = gparams::get_value("smt.ematching");
+
+        gparams::set("auto-config", "false");
+        gparams::set("smt.mbqi", "false");
+        gparams::set("smt.ematching", "false");
 
         ctx.set_global_decls_unsafe(true);
         ctx.global_params_updated();
@@ -284,9 +305,12 @@ protected:
         ctx.m().new_func_decl_eh = 0;
         ctx.m().erase_func_decl_eh = 0;
 
+        gparams::set("auto-config", m_auto_config_before.c_str());
+        gparams::set("smt.mbqi", m_mbqi_before.c_str());
+        gparams::set("smt.ematching", m_ematching_before.c_str());
+
         ctx.params() = m_ctx_params_before;
-        ctx.set_global_decls_unsafe(m_global_decls_before);
-        gparams::get() = m_gparams_before;
+        ctx.set_global_decls_unsafe(m_global_decls_before);                
     }
 
 public:
@@ -303,18 +327,14 @@ public:
                 tout << mk_ismt2_pp(*it, ctx.m()) << std::endl;
         );
 
+        setup_env(ctx);
+        inject_func_decls(ctx.m(), ctx);
+
         nasty_hack * hacked_ctx = reinterpret_cast<nasty_hack*>(&ctx);
         ref<solver> slvr = hacked_ctx->get_solver();
         SASSERT(slvr);
-
-        setup_env(ctx);
-        inject_func_decls(ctx.m(), ctx);
+                        
         slvr->push(); // forces internalization
-
-        gparams::set("auto-config", "false");
-        gparams::set("smt.mbqi", "false");
-        gparams::set("smt.ematching", "false");
-        ctx.global_params_updated();
 
         std::ifstream strm(m_log_filename.c_str());
         if (!strm.is_open())
@@ -326,6 +346,10 @@ public:
 
         restore_env(ctx);
         slvr->pop(1);
+
+        ctx.set_check_sat_result(slvr.get());
+        
+        IF_VERBOSE(10, verbose_stream() << "(smt.end-of-replay)" << std::endl; );
     }
     virtual void prepare(cmd_context & ctx) { reset(ctx); }
     virtual void reset(cmd_context& ctx) { m_log_filename = ""; }
