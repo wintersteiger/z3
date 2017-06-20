@@ -420,7 +420,7 @@ sort * get_sort(expr const * n) {
 //
 // -----------------------------------
 
-unsigned get_node_size(ast const * n) {
+size_t get_node_size(ast const * n) {
     switch(n->get_kind()) {
     case AST_SORT:       return to_sort(n)->get_size();
     case AST_FUNC_DECL:  return to_func_decl(n)->get_size();
@@ -1930,7 +1930,7 @@ app * ast_manager::mk_app(family_id fid, decl_kind k, expr * arg1, expr * arg2, 
 }
 
 sort * ast_manager::mk_sort(symbol const & name, sort_info * info) {
-    unsigned sz      = sort::get_obj_size();
+    size_t sz        = sort::get_obj_size();
     void * mem       = allocate_node(sz);
     sort * new_node  = new (mem) sort(name, info);
     return register_node(new_node);
@@ -1955,7 +1955,7 @@ func_decl * ast_manager::mk_func_decl(symbol const & name, unsigned arity, sort 
     SASSERT(arity == 1 || info == 0 || !info->is_injective());
     SASSERT(arity == 2 || info == 0 || !info->is_associative());
     SASSERT(arity == 2 || info == 0 || !info->is_commutative());
-    unsigned sz               = func_decl::get_obj_size(arity);
+    size_t sz                 = func_decl::get_obj_size(arity);
     void * mem                = allocate_node(sz);
     func_decl * new_node = new (mem) func_decl(name, arity, domain, range, info);
     return register_node(new_node);
@@ -2070,7 +2070,7 @@ bool ast_manager::coercion_needed(func_decl * decl, unsigned num_args, expr * co
 app * ast_manager::mk_app_core(func_decl * decl, unsigned num_args, expr * const * args) {
     app * r = 0;
     app * new_node = 0;
-    unsigned sz = app::get_obj_size(num_args);
+    size_t sz = app::get_obj_size(num_args);
     void * mem = allocate_node(sz);
 
     try {
@@ -2254,7 +2254,7 @@ symbol ast_manager::mk_fresh_var_name(char const * prefix) {
 }
 
 var * ast_manager::mk_var(unsigned idx, sort * s) {
-    unsigned sz     = var::get_obj_size();
+    size_t sz       = var::get_obj_size();
     void * mem      = allocate_node(sz);
     var * new_node  = new (mem) var(idx, s);
     return register_node(new_node);
@@ -2354,8 +2354,8 @@ quantifier * ast_manager::mk_quantifier(bool forall, unsigned num_decls, sort * 
             for (unsigned i = 0; i < num_patterns; ++i) {
                 SASSERT(is_pattern(patterns[i]));
             }});
-    unsigned sz               = quantifier::get_obj_size(num_decls, num_patterns, num_no_patterns);
-    void * mem                = allocate_node(sz);
+    size_t sz  = quantifier::get_obj_size(num_decls, num_patterns, num_no_patterns);
+    void * mem = allocate_node(sz);
     quantifier * new_node = new (mem) quantifier(forall, num_decls, decl_sorts, decl_names, body,
                                                  weight, qid, skid, num_patterns, patterns,
                                                  num_no_patterns, no_patterns);

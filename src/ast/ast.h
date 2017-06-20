@@ -560,7 +560,7 @@ public:
 class sort : public decl {
     friend class ast_manager;
 
-    static unsigned get_obj_size() { return sizeof(sort); }
+    static size_t get_obj_size() { return sizeof(sort); }
 
     sort(symbol const & name, sort_info * info):decl(AST_SORT, name, info) {}
 public:
@@ -569,7 +569,7 @@ public:
     bool is_very_big() const { return get_info() == 0 || get_info()->is_very_big(); }
     bool is_sort_of(family_id fid, decl_kind k) const { return get_family_id() == fid && get_decl_kind() == k; }
     sort_size const & get_num_elements() const { return get_info()->get_num_elements(); }
-    unsigned get_size() const { return get_obj_size(); }
+    size_t get_size() const { return get_obj_size(); }
 };
 
 // -----------------------------------
@@ -585,7 +585,11 @@ class func_decl : public decl {
     sort *           m_range;
     sort *           m_domain[0];
 
-    static unsigned get_obj_size(unsigned arity) { return sizeof(func_decl) + arity * sizeof(sort *); }
+    static size_t get_obj_size(unsigned arity) { 
+        if (arity > (SIZE_MAX/sizeof(sort *)) - 1)
+            return SIZE_MAX;
+        return sizeof(func_decl) + arity * sizeof(sort *); 
+    }
 
     func_decl(symbol const & name, unsigned arity, sort * const * domain, sort * range, func_decl_info * info);
 public:
@@ -604,7 +608,7 @@ public:
     sort * get_domain(unsigned idx) const { SASSERT(idx < get_arity()); return m_domain[idx]; }
     sort * const * get_domain() const { return m_domain; }
     sort * get_range() const { return m_range; }
-    unsigned get_size() const { return get_obj_size(m_arity); }
+    size_t get_size() const { return get_obj_size(m_arity); }
 };
 
 // -----------------------------------
@@ -649,7 +653,9 @@ class app : public expr {
     static app_flags g_constant_flags;
 
     // remark: store term depth in the end of the app. the depth is only stored if the num_args > 0
-    static unsigned get_obj_size(unsigned num_args) {
+    static size_t get_obj_size(unsigned num_args) {
+        if (num_args > (SIZE_MAX/sizeof(expr *)) - 2)
+            return SIZE_MAX;
         return num_args == 0 ? sizeof(app) : sizeof(app) + num_args * sizeof(expr *) + sizeof(app_flags);
     }
 
@@ -666,7 +672,7 @@ public:
     unsigned get_num_args() const { return m_num_args; }
     expr * get_arg(unsigned idx) const { SASSERT(idx < m_num_args); return m_args[idx]; }
     expr * const * get_args() const { return m_args; }
-    unsigned get_size() const { return get_obj_size(get_num_args()); }
+    size_t get_size() const { return get_obj_size(get_num_args()); }
 
     unsigned get_depth() const { return flags()->m_depth; }
     bool is_ground() const { return flags()->m_ground; }
@@ -689,7 +695,7 @@ class tmp_app {
 public:
     tmp_app(unsigned num_args):
         m_num_args(num_args) {
-        unsigned sz = app::get_obj_size(num_args);
+        size_t sz = app::get_obj_size(num_args);
         m_data = alloc_svect(char, sz);
         memset(m_data, 0, sz);
         get_app()->m_num_args = m_num_args;
@@ -750,13 +756,13 @@ class var : public expr {
     unsigned     m_idx;
     sort *       m_sort;
 
-    static unsigned get_obj_size() { return sizeof(var); }
+    static size_t get_obj_size() { return sizeof(var); }
 
     var(unsigned idx, sort * s):expr(AST_VAR), m_idx(idx), m_sort(s) {}
 public:
     unsigned get_idx() const { return m_idx; }
     sort * get_sort() const { return m_sort; }
-    unsigned get_size() const { return get_obj_size(); }
+    size_t get_size() const { return get_obj_size(); }
 };
 
 // -----------------------------------
@@ -781,7 +787,11 @@ class quantifier : public expr {
     unsigned            m_num_no_patterns;
     char                m_patterns_decls[0];
 
-    static unsigned get_obj_size(unsigned num_decls, unsigned num_patterns, unsigned num_no_patterns) {
+    static size_t get_obj_size(unsigned num_decls, unsigned num_patterns, unsigned num_no_patterns) {
+        if (num_decls > SIZE_MAX/(sizeof(sort *) + sizeof(symbol)) ||
+            (num_patterns + num_no_patterns) > SIZE_MAX/sizeof(expr*) ||
+            (num_decls + num_patterns + num_no_patterns) > SIZE_MAX/(sizeof(sort *) + sizeof(symbol) + sizeof(expr*)))
+            return SIZE_MAX;
         return sizeof(quantifier) + num_decls * (sizeof(sort *) + sizeof(symbol)) + (num_patterns + num_no_patterns) * sizeof(expr*);
     }
 
@@ -810,7 +820,7 @@ public:
     expr * const * get_no_patterns() const { return reinterpret_cast<expr * const *>(get_decl_names() + m_num_decls); }
     expr * get_no_pattern(unsigned idx) const { return get_no_patterns()[idx]; }
     bool has_patterns() const { return m_num_patterns > 0 || m_num_no_patterns > 0; }
-    unsigned get_size() const { return get_obj_size(m_num_decls, m_num_patterns, m_num_no_patterns); }
+    size_t get_size() const { return get_obj_size(m_num_decls, m_num_patterns, m_num_no_patterns); }
 
     bool may_have_unused_vars() const { return m_has_unused_vars; }
     void set_no_unused_vars() { m_has_unused_vars = false; }
@@ -876,7 +886,7 @@ inline quantifier const * to_quantifier(ast const * n) { SASSERT(is_quantifier(n
 
 unsigned get_node_hash(ast const * n);
 bool compare_nodes(ast const * n1, ast const * n2);
-unsigned get_node_size(ast const * n);
+size_t get_node_size(ast const * n);
 unsigned get_asts_hash(unsigned sz, ast * const* ns, unsigned init);
 unsigned get_apps_hash(unsigned sz, app * const* ns, unsigned init);
 unsigned get_exprs_hash(unsigned sz, expr * const* ns, unsigned init);
