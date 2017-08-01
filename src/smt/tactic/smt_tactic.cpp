@@ -16,19 +16,19 @@ Author:
 Notes:
 
 --*/
-#include"tactic.h"
-#include"tactical.h"
-#include"smt_kernel.h"
-#include"smt_params.h"
+#include "tactic/tactic.h"
+#include "tactic/tactical.h"
+#include "smt/smt_kernel.h"
+#include "smt/params/smt_params.h"
 #include"smt_params_helper.hpp"
 #include"lp_params.hpp"
-#include"rewriter_types.h"
-#include"filter_model_converter.h"
-#include"ast_util.h"
-#include"solver2tactic.h"
-#include"smt_solver.h"
-#include"solver.h"
-#include"mus.h"
+#include "ast/rewriter/rewriter_types.h"
+#include "tactic/filter_model_converter.h"
+#include "ast/ast_util.h"
+#include "solver/solver2tactic.h"
+#include "smt/smt_solver.h"
+#include "solver/solver.h"
+#include "solver/mus.h"
 
 typedef obj_map<expr, expr *> expr2expr_map;
 
@@ -253,7 +253,7 @@ public:
                 if (m_ctx->canceled()) {
                     throw tactic_exception(Z3_CANCELED_MSG);
                 }
-                if (m_fail_if_inconclusive) {
+                if (m_fail_if_inconclusive && !m_candidate_models) {
                     std::stringstream strm;
                     strm << "smt tactic failed to show goal to be sat/unsat " << m_ctx->last_failure_as_string();
                     throw tactic_exception(strm.str().c_str());

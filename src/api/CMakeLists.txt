@@ -7,7 +7,7 @@ set(generated_files
 # Sanity check
 foreach (gen_file ${generated_files})
   if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${gen_file}")
-    message(FATAL_ERROR "\"${CMAKE_CURRENT_SOURCE_DIR}/${gen_files}\""
+    message(FATAL_ERROR "\"${CMAKE_CURRENT_SOURCE_DIR}/${gen_file}\""
             ${z3_polluted_tree_msg})
   endif()
 endforeach()
@@ -57,6 +57,7 @@ z3_add_component(api
     api_parsers.cpp
     api_pb.cpp
     api_polynomial.cpp
+    api_qe.cpp
     api_quant.cpp
     api_rcf.cpp
     api_seq.cpp

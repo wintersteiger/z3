@@ -19,10 +19,10 @@ Revision History:
 
 --*/
 
-#include "dl_mk_quantifier_abstraction.h"
-#include "dl_context.h"
-#include "expr_safe_replace.h"
-#include "expr_abstract.h"
+#include "muz/transforms/dl_mk_quantifier_abstraction.h"
+#include "muz/base/dl_context.h"
+#include "ast/rewriter/expr_safe_replace.h"
+#include "ast/expr_abstract.h"
 #include"fixedpoint_params.hpp"
 
 
@@ -142,7 +142,8 @@ namespace datalog {
         m(ctx.get_manager()),
         m_ctx(ctx),
         a(m),
-        m_refs(m) {        
+        m_refs(m),
+        m_mc(NULL){        
     }
 
     mk_quantifier_abstraction::~mk_quantifier_abstraction() {        

@@ -19,7 +19,7 @@ Revision History:
 #ifndef RATIONAL_H_
 #define RATIONAL_H_
 
-#include"mpq.h"
+#include "util/mpq.h"
 
 class rational {
     mpq   m_val;
@@ -68,6 +68,8 @@ public:
     mpq const & to_mpq() const { return m_val; }
 
     unsigned bitsize() const { return m().bitsize(m_val); }
+
+    unsigned storage_size() const { return m().storage_size(m_val); }
     
     void reset() { m().reset(m_val); }
 

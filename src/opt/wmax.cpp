@@ -16,14 +16,14 @@ Author:
 Notes:
 
 --*/
-#include "wmax.h"
-#include "uint_set.h"
-#include "ast_pp.h"
-#include "model_smt2_pp.h"
-#include "smt_theory.h"
-#include "smt_context.h"
-#include "theory_wmaxsat.h"
-#include "opt_context.h"
+#include "opt/wmax.h"
+#include "util/uint_set.h"
+#include "ast/ast_pp.h"
+#include "model/model_smt2_pp.h"
+#include "smt/smt_theory.h"
+#include "smt/smt_context.h"
+#include "smt/theory_wmaxsat.h"
+#include "opt/opt_context.h"
 
 namespace opt {
     // ----------------------------------------------------------
@@ -216,7 +216,7 @@ namespace opt {
         rational remove_negations(smt::theory_wmaxsat& th, expr_ref_vector const& core, ptr_vector<expr>& keys, vector<rational>& weights) {
             rational min_weight(-1);
             for (unsigned i = 0; i < core.size(); ++i) {
-                expr* e;
+                expr* e = 0;
                 VERIFY(m.is_not(core[i], e));
                 keys.push_back(m_keys[e]);
                 rational weight = m_weights[e];

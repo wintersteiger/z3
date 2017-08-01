@@ -17,32 +17,32 @@ Notes:
 
 --*/
 
-#include "opt_context.h"
-#include "ast_pp.h"
-#include "opt_solver.h"
+#include "opt/opt_context.h"
+#include "ast/ast_pp.h"
+#include "opt/opt_solver.h"
 #include "opt_params.hpp"
-#include "for_each_expr.h"
-#include "goal.h"
-#include "tactic.h"
-#include "lia2card_tactic.h"
-#include "elim01_tactic.h"
-#include "solve_eqs_tactic.h"
-#include "simplify_tactic.h"
-#include "propagate_values_tactic.h"
-#include "solve_eqs_tactic.h"
-#include "elim_uncnstr_tactic.h"
-#include "tactical.h"
-#include "model_smt2_pp.h"
-#include "card2bv_tactic.h"
-#include "eq2bv_tactic.h"
-#include "dt2bv_tactic.h"
-#include "inc_sat_solver.h"
-#include "bv_decl_plugin.h"
-#include "pb_decl_plugin.h"
-#include "ast_smt_pp.h"
-#include "filter_model_converter.h"
-#include "ast_pp_util.h"
-#include "qsat.h"
+#include "ast/for_each_expr.h"
+#include "tactic/goal.h"
+#include "tactic/tactic.h"
+#include "tactic/arith/lia2card_tactic.h"
+#include "tactic/arith/elim01_tactic.h"
+#include "tactic/core/solve_eqs_tactic.h"
+#include "tactic/core/simplify_tactic.h"
+#include "tactic/core/propagate_values_tactic.h"
+#include "tactic/core/solve_eqs_tactic.h"
+#include "tactic/core/elim_uncnstr_tactic.h"
+#include "tactic/tactical.h"
+#include "model/model_smt2_pp.h"
+#include "tactic/arith/card2bv_tactic.h"
+#include "tactic/arith/eq2bv_tactic.h"
+#include "tactic/bv/dt2bv_tactic.h"
+#include "sat/sat_solver/inc_sat_solver.h"
+#include "ast/bv_decl_plugin.h"
+#include "ast/pb_decl_plugin.h"
+#include "ast/ast_smt_pp.h"
+#include "tactic/filter_model_converter.h"
+#include "ast/ast_pp_util.h"
+#include "qe/qsat.h"
 
 namespace opt {
 
@@ -1313,17 +1313,18 @@ namespace opt {
         rational r   = n.get_rational();
         rational eps = n.get_infinitesimal();
         expr_ref_vector args(m);
+        bool is_int = eps.is_zero() && r.is_int();
         if (!inf.is_zero()) {
-            expr* oo = m.mk_const(symbol("oo"), m_arith.mk_int());
+            expr* oo = m.mk_const(symbol("oo"), is_int ? m_arith.mk_int() : m_arith.mk_real());
             if (inf.is_one()) {
                 args.push_back(oo);
             }
             else {
-                args.push_back(m_arith.mk_mul(m_arith.mk_numeral(inf, inf.is_int()), oo));
+                args.push_back(m_arith.mk_mul(m_arith.mk_numeral(inf, is_int), oo));
             }
         }
         if (!r.is_zero()) {
-            args.push_back(m_arith.mk_numeral(r, r.is_int()));
+            args.push_back(m_arith.mk_numeral(r, is_int));
         }
         if (!eps.is_zero()) {
             expr* ep = m.mk_const(symbol("epsilon"), m_arith.mk_real());
@@ -1331,7 +1332,7 @@ namespace opt {
                 args.push_back(ep);
             }
             else {
-                args.push_back(m_arith.mk_mul(m_arith.mk_numeral(eps, eps.is_int()), ep));
+                args.push_back(m_arith.mk_mul(m_arith.mk_numeral(eps, is_int), ep));
             }
         }
         switch(args.size()) {

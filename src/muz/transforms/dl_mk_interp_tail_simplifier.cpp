@@ -19,14 +19,15 @@ Revision History:
 
 
 #include <sstream>
-#include"ast_pp.h"
-#include"bool_rewriter.h"
-#include"rewriter.h"
-#include"rewriter_def.h"
-#include"dl_mk_rule_inliner.h"
-#include"dl_mk_interp_tail_simplifier.h"
-#include"ast_util.h"
+#include "ast/ast_pp.h"
+#include "ast/rewriter/bool_rewriter.h"
+#include "ast/rewriter/rewriter.h"
+#include "ast/rewriter/rewriter_def.h"
+#include "muz/transforms/dl_mk_rule_inliner.h"
+#include "muz/transforms/dl_mk_interp_tail_simplifier.h"
+#include "ast/ast_util.h"
 
+#include "fixedpoint_params.hpp"
 namespace datalog {
 
     // -----------------------------------
@@ -250,7 +251,7 @@ namespace datalog {
         bool detect_equivalences(expr_ref_vector& v, bool inside_disjunction)
         {
             bool have_pair = false;
-            unsigned prev_pair_idx;
+            unsigned prev_pair_idx = 0;
             arg_pair ap;
 
             unsigned read_idx = 0;
@@ -296,21 +297,20 @@ namespace datalog {
         br_status reduce_app(func_decl * f, unsigned num, expr * const * args, expr_ref & result, 
             proof_ref & result_pr)
         {
-
             if (m.is_not(f) && (m.is_and(args[0]) || m.is_or(args[0]))) {
-                SASSERT(num==1);
+                SASSERT(num == 1);
                 expr_ref tmp(m);
                 app* a = to_app(args[0]);
                 m_app_args.reset();
-                for (unsigned i = 0; i < a->get_num_args(); ++i) {
-                    m_brwr.mk_not(a->get_arg(i), tmp);
+                for (expr* arg : *a) {
+                    m_brwr.mk_not(arg, tmp);
                     m_app_args.push_back(tmp);
                 }
                 if (m.is_and(args[0])) {
-                    result = m.mk_or(m_app_args.size(), m_app_args.c_ptr());
+                    result = mk_or(m_app_args); 
                 }
                 else {
-                    result = m.mk_and(m_app_args.size(), m_app_args.c_ptr());
+                    result = mk_and(m_app_args); 
                 }
                 return BR_REWRITE2;
             }
@@ -398,6 +398,8 @@ namespace datalog {
     }
 
     bool mk_interp_tail_simplifier::propagate_variable_equivalences(rule * r, rule_ref& res) {
+      if (!m_context.get_params ().xform_tail_simplifier_pve ())
+        return false;
         unsigned u_len = r->get_uninterpreted_tail_size();
         unsigned len = r->get_tail_size();
         if (u_len == len) {

@@ -16,12 +16,12 @@ Author:
 Revision History:
 
 --*/
-#include "smt_context.h"
-#include "ast_util.h"
-#include "datatype_decl_plugin.h"
-#include "model_pp.h"
-#include "max_cliques.h"
-#include "stopwatch.h"
+#include "smt/smt_context.h"
+#include "ast/ast_util.h"
+#include "ast/datatype_decl_plugin.h"
+#include "model/model_pp.h"
+#include "util/max_cliques.h"
+#include "util/stopwatch.h"
 
 namespace smt {
 
@@ -103,6 +103,7 @@ namespace smt {
 
     void context::justify(literal lit, index_set& s) {
         ast_manager& m = m_manager;
+        (void)m;
         b_justification js = get_justification(lit.var());
         switch (js.get_kind()) {
         case b_justification::CLAUSE: {

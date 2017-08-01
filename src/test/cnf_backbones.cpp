@@ -5,11 +5,11 @@ Copyright (c) 2017 Microsoft Corporation
 #include<iostream>
 #include<time.h>
 #include<signal.h>
-#include"timeout.h"
-#include"rlimit.h"
-#include"dimacs.h"
-#include"sat_solver.h"
-#include"gparams.h"
+#include "util/timeout.h"
+#include "util/rlimit.h"
+#include "sat/dimacs.h"
+#include "sat/sat_solver.h"
+#include "util/gparams.h"
 
 static sat::solver * g_solver = 0;
 static clock_t       g_start_time;
@@ -38,6 +38,7 @@ static void STD_CALL on_ctrl_c(int) {
     raise(SIGINT);
 }
 
+#if 0
 static void display_model(sat::solver const & s) {
     sat::model const & m = s.get_model();
     for (unsigned i = 1; i < m.size(); i++) {
@@ -49,6 +50,7 @@ static void display_model(sat::solver const & s) {
     }
     std::cout << "\n";
 }
+#endif
 
 static void display_status(lbool r) {
     switch (r) {

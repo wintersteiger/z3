@@ -10,11 +10,11 @@ Author:
 #include "lp_params.hpp"
 #include "util/lp/lp_settings.h"
 #include "util/lp/mps_reader.h"
-#include "timeout.h"
-#include "cancel_eh.h"
-#include "scoped_timer.h"
-#include "rlimit.h"
-#include "gparams.h"
+#include "util/timeout.h"
+#include "util/cancel_eh.h"
+#include "util/scoped_timer.h"
+#include "util/rlimit.h"
+#include "util/gparams.h"
 #include <signal.h>
 
 static lean::lp_solver<double, double>* g_solver = 0;
@@ -80,6 +80,8 @@ void run_solver(lp_params & params, char const * mps_file_name) {
     solver->settings().set_message_ostream(&std::cout);
     solver->settings().report_frequency = params.rep_freq();
     solver->settings().print_statistics = params.print_stats();
+    solver->settings().simplex_strategy() = lean:: simplex_strategy_enum::lu;
+    
     solver->find_maximal_solution();
 
     *(solver->settings().get_message_ostream()) << "status is " << lp_status_to_string(solver->get_status()) << std::endl;

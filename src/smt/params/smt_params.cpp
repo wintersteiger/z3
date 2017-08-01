@@ -16,10 +16,10 @@ Author:
 Revision History:
 
 --*/
-#include"smt_params.h"
+#include "smt/params/smt_params.h"
 #include"smt_params_helper.hpp"
 #include"model_params.hpp"
-#include"gparams.h"
+#include "util/gparams.h"
 
 void smt_params::updt_local_params(params_ref const & _p) {
     smt_params_helper p(_p);
@@ -50,6 +50,9 @@ void smt_params::updt_local_params(params_ref const & _p) {
         m_arith_pivot_strategy = ARITH_PIVOT_LEAST_ERROR;
     theory_array_params::updt_params(_p);
     m_search_log = p.search_log();
+    m_dump_benchmarks = false;
+    m_dump_min_time = 0.5;
+    m_dump_recheck = false;
 }
 
 void smt_params::updt_params(params_ref const & p) {

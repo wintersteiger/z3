@@ -19,8 +19,8 @@ Revision History:
 #ifndef MPQ_H_
 #define MPQ_H_
 
-#include"mpz.h"
-#include"trace.h"
+#include "util/mpz.h"
+#include "util/trace.h"
 
 class mpq {
     mpz m_num;
@@ -176,7 +176,7 @@ public:
 
     static bool is_small(mpz const & a) { return mpz_manager<SYNCH>::is_small(a); }
 
-    static bool is_small(mpq const & a) { return is_small(a.m_num) && is_small(a.m_den); }
+    static bool is_small(mpq const & a) { return is_small(a.m_num) && is_small(a.m_den); }    
 
     static mpq mk_q(int v) { return mpq(v); }
 
@@ -786,6 +786,8 @@ public:
 
     unsigned bitsize(mpz const & a) { return mpz_manager<SYNCH>::bitsize(a); }
     unsigned bitsize(mpq const & a) { return is_int(a) ? bitsize(a.m_num) : bitsize(a.m_num) + bitsize(a.m_den); }
+    unsigned storage_size(mpz const & a) { return mpz_manager<SYNCH>::size_info(a); }
+    unsigned storage_size(mpq const & a) { return mpz_manager<SYNCH>::size_info(a.m_num) + mpz_manager<SYNCH>::size_info(a.m_den); }
 
     /**
        \brief Return true if the number is a perfect square, and 
