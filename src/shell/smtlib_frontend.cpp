@@ -33,6 +33,7 @@ Revision History:
 #include "smt/smt2_extra_cmds.h"
 #include "tactic/portfolio/smt_strategic_solver.h"
 #include "smt/smt_solver.h"
+#include "smt/replay_cmds.h"
 
 extern bool g_display_statistics;
 static clock_t             g_start_time;
