@@ -11,6 +11,7 @@ z3_add_component(smt
     fingerprints.cpp
     mam.cpp
     old_interval.cpp
+    replay_cmds.cpp
     qi_queue.cpp
     smt_almost_cg_table.cpp
     smt_case_split_queue.cpp
