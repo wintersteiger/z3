@@ -19,7 +19,7 @@
 #include "muz/base/dl_rule_set.h"
 #include "smt/tactic/unit_subsumption_tactic.h"
 #include "model/model_smt2_pp.h"
-#include "dl_mk_rule_inliner.h"
+#include "muz/transforms/dl_mk_rule_inliner.h"
 #include "ast/ast_smt2_pp.h"
 #include "ast/ast_ll_pp.h"
 #include "ast/ast_util.h"
@@ -34,7 +34,7 @@
 #include "util/luby.h"
 #include "ast/rewriter/expr_safe_replace.h"
 #include "ast/expr_abstract.h"
-#include "muz/spacer/obj_equiv_class.h"
+#include "ast/factor_equivs.h"
 
 
 namespace spacer {
