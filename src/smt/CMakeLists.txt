@@ -39,6 +39,7 @@ z3_add_component(smt
     smt_quick_checker.cpp
     smt_relevancy.cpp
     smt_setup.cpp
+    smt_search_log.cpp
     smt_solver.cpp
     smt_statistics.cpp
     smt_theory.cpp

@@ -154,7 +154,6 @@ namespace smt {
         }
 
         void unassign_qid(quantifier * q) {
-            ast_manager & m = m_context.get_manager();
             symbol const & qid = get_qid(q);
             TRACE("qi_log_instance_detail", tout << "Unassign quantifier " << qid << std::endl; );
 

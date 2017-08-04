@@ -49,7 +49,7 @@ Revision History:
 #include "util/timer.h"
 #include "util/statistics.h"
 #include "solver/progress_callback.h"
-#include "smt_search_log.h"
+#include "smt/smt_search_log.h"
 
 // there is a significant space overhead with allocating 1000+ contexts in
 // the case that each context only references a few expressions.
