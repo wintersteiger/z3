@@ -25,7 +25,7 @@ Revision History:
 #include "ast/ast_ll_pp.h"
 #include "ast/rewriter/var_subst.h"
 #include "util/stats.h"
-#include "smt2parser.h"
+#include "parsers/smt2/smt2parser.h"
 
 namespace smt {
 
