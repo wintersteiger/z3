@@ -331,13 +331,20 @@ void asserted_formulas::display(std::ostream & out) const {
 void asserted_formulas::display_ll(std::ostream & out, ast_mark & pp_visited) const {
     if (!m_asserted_formulas.empty()) {
         unsigned sz = m_asserted_formulas.size();
-        for (unsigned i = 0; i < sz; i++) 
+        for (unsigned i = 0; i < sz; i++)
             ast_def_ll_pp(out, m, m_asserted_formulas.get(i), pp_visited, true, false);
         out << "asserted formulas:\n";
-        for (unsigned i = 0; i < sz; i++) 
+        for (unsigned i = 0; i < sz; i++)
             out << "#" << m_asserted_formulas[i]->get_id() << " ";
         out << "\n";
     }
+}
+
+void asserted_formulas::display_smt2(std::ostream & out) const {
+    params_ref p;
+    p.set_bool("single_line", true);
+    for (unsigned i = 0; i < m_asserted_formulas.size(); i++)
+        out << mk_ismt2_pp(m_asserted_formulas[i], m, p) << "\n";
 }
 
 void asserted_formulas::collect_statistics(statistics & st) const {

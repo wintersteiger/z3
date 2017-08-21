@@ -126,10 +126,11 @@ public:
     void collect_static_features();
     void display(std::ostream & out) const;
     void display_ll(std::ostream & out, ast_mark & pp_visited) const;
+    void display_smt2(std::ostream & out) const;
     void collect_statistics(statistics & st) const;
     // TODO: improve precision of the following method.
     bool has_quantifiers() const { return m_simplifier.visited_quantifier(); /* approximation */ }
-    
+
     // -----------------------------------
     //
     // Macros

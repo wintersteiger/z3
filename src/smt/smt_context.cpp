@@ -3305,6 +3305,7 @@ namespace smt {
         internalize_assertions();
         lbool r = l_undef;
         TRACE("before_search", display(tout););
+        TRACE("before_search_smt2", m_asserted_formulas.display_smt2(tout););
         if (m_asserted_formulas.inconsistent()) {
             r = l_false;
         }
@@ -3401,6 +3402,7 @@ namespace smt {
         TRACE("unsat_core_bug", for (unsigned i = 0; i < num_assumptions; i++) { tout << mk_pp(assumptions[i], m_manager) << "\n";});
         pop_to_base_lvl();
         TRACE("before_search", display(tout););
+        TRACE("before_search_smt2", m_asserted_formulas.display_smt2(tout););
         SASSERT(at_base_level());
 
         lbool r = l_undef;
@@ -3413,6 +3415,7 @@ namespace smt {
             m_search_log.note("(check-sat) starts here (check(assumptions)).");
             internalize_assertions();
             TRACE("after_internalize_assertions", display(tout););
+            TRACE("after_internalize_assertions_smt2", m_asserted_formulas.display_smt2(tout););
             if (m_asserted_formulas.inconsistent()) {
                 r = l_false;
             }

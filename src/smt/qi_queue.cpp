@@ -293,6 +293,7 @@ namespace smt {
             m_instances.push_back(pr1);
         }
         TRACE("qi_queue", tout << mk_pp(lemma, m_manager) << "\n#" << lemma->get_id() << ":=\n" << mk_ll_pp(lemma, m_manager););
+        TRACE("qi_queue_lemma", tout << "iLemma:\n" << mk_ismt2_pp(lemma, m_manager) << "\n";);
         m_stats.m_num_instances++;
         unsigned gen = get_new_gen(q, generation, ent.m_cost);
         display_instance_profile(f, q, num_bindings, bindings, proof_id, gen);
