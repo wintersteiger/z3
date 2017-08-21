@@ -28,7 +28,8 @@ namespace smt {
         m(m),
         m_ctx(ctx),
         m_qmanager(qm),
-        m_strm(0) {
+        m_strm(0),
+        m_redundant_instances(0) {
         m_pp_params.set_bool("single_line", true);
     }
 
@@ -114,7 +115,7 @@ namespace smt {
                                   unsigned num_bindings, enode * const * bindings,
                                   expr_ref instance,
                                   unsigned generation, unsigned scope) {
-        TRACE("qi_log_instance_detail",
+        TRACE("search_log_instance_detail",
             tout << "Quantifier (lqid=" << m_qmanager.get_qid(q) << "): " << std::endl;
             tout << mk_ismt2_pp(q, m) << std::endl;
             tout << "Bindings: " << std::endl;
@@ -123,7 +124,7 @@ namespace smt {
             tout << "Instance: " << std::endl;
             tout << mk_ismt2_pp(instance, m) << std::endl; );
 
-        TRACE("qi_log_instance_short",
+        TRACE("search_log_instance_short",
             tout << "Instantiate lqid=" << m_qmanager.get_qid(q) << " with: " << std::endl;
             for (unsigned i = 0; i < num_bindings; i++)
                 tout << mk_ismt2_pp(bindings[i]->get_owner(), m) << std::endl; );
@@ -150,7 +151,7 @@ namespace smt {
         }
     }
 
-    bool search_log::is_instance(expr const * e, quantifier * & q) const {
+    bool search_log::is_instance(expr const * e, ptr_vector<quantifier> & qs) const {
         // Instances are represented by terms of the form
         // (=>  (! false :lblpos k!<lqid> :lblpos k!<base-idx>)
         //      (exists ((x ...) ...) (! (and (= ...) (= ...) ...))))
@@ -173,36 +174,43 @@ namespace smt {
                     return false;
 
                 symbol qid = names[0];
-                if (!m_qmanager.find(qid, q)) {
+                ptr_vector<quantifier> qsa;
+                if (!m_qmanager.find(qid, qsa)) {
                     warning_msg("quantifier with qid '%s' not found; ignoring instance", qid.str().c_str());
                     return false;
                 }
                 else {
-                    sort * const * q_sorts = q->get_decl_sorts();
-                    if (iq_num_decls != q->get_num_decls())
-                        return false;
-                    for (unsigned i = 0; i < iq_num_decls; i++)
-                        if (iq_sorts[i] != q_sorts[i])
-                            return false;
-                    if (!m.is_and(pq_body))
-                        return false;
-                    app * a_body = to_app(pq_body);
-                    unsigned sz = a_body->get_num_args();
-                    for (unsigned i = 0; i < sz; i++) {
-                        expr * ai = a_body->get_arg(i);
-                        if (!m.is_eq(ai))
-                            return false;
-                        app * aai = to_app(ai);
-                        if (aai->get_num_args() != 2)
-                            return false;
-                        expr * var = aai->get_arg(0);
-                        expr_ref val(aai->get_arg(1), m);
-                        if (var->get_kind() != AST_VAR ||
-                            to_var(var)->get_idx() != (iq_num_decls - i - 1) ||
-                            !is_ground(val))
-                            return false;
+                    for (unsigned i = 0; i < qsa.size(); i++) {
+                        quantifier * q = qsa[i];
+                        if (qs.contains(q))
+                            continue;
+                        sort * const * q_sorts = q->get_decl_sorts();
+                        if (iq_num_decls != q->get_num_decls())
+                            continue;
+                        for (unsigned i = 0; i < iq_num_decls; i++)
+                            if (iq_sorts[i] != q_sorts[i])
+                                return false;
+                        if (!m.is_and(pq_body))
+                            continue;
+                        app * a_body = to_app(pq_body);
+                        unsigned sz = a_body->get_num_args();
+                        for (unsigned i = 0; i < sz; i++) {
+                            expr * ai = a_body->get_arg(i);
+                            if (!m.is_eq(ai))
+                                continue;
+                            app * aai = to_app(ai);
+                            if (aai->get_num_args() != 2)
+                                continue;
+                            expr * var = aai->get_arg(0);
+                            expr_ref val(aai->get_arg(1), m);
+                            if (var->get_kind() != AST_VAR ||
+                                to_var(var)->get_idx() != (iq_num_decls - i - 1) ||
+                                !is_ground(val))
+                                continue;
+                        }
+                        qs.insert(q);
                     }
-                    return true;
+                    return qs.size() > 0;
                 }
             }
         }
@@ -224,7 +232,7 @@ namespace smt {
             m_ctx.get_simplifier()(val, sval, pr);
 
             if (!m_ctx.e_internalized(sval) && !m_ctx.b_internalized(sval)) {
-                TRACE("qi_log_instance_bindings", tout << "(= " << mk_ismt2_pp(var, m) << " " << mk_ismt2_pp(sval, m) << ")" << std::endl;);
+                TRACE("search_log_instance_bindings", tout << "(= " << mk_ismt2_pp(var, m) << " " << mk_ismt2_pp(sval, m) << ")" << std::endl;);
                 m_ctx.internalize(sval, false); // +generation?
             }
 
@@ -234,18 +242,33 @@ namespace smt {
     }
 
     bool search_log::replay_instance(expr_ref const & instance) {
-        quantifier * q;
+        ptr_vector<quantifier> qs;
 
-        if (!is_instance(instance, q)) {
+        if (!is_instance(instance, qs)) {
             throw default_exception("Invalid quantifier instance");
         }
         else {
-            TRACE("qi_log_instance", tout << mk_ismt2_pp(instance, m) << std::endl;);
-            unsigned num_bindings;
-            ptr_vector<smt::enode> bindings;
-            mk_instance_bindings(instance, num_bindings, bindings);
-            bool r = m_qmanager.add_instance(q, num_bindings, bindings.c_ptr());
-            m_qmanager.propagate();
+            bool r = false;
+            if (qs.size() > 1) {
+                warning_msg("quantifier id '%s' matches %d quantifiers; adding all instances.", qs[0]->get_qid().str().c_str(), qs.size());
+                TRACE("search_log_instance",
+                    tout << "Instance matches multiple quantifiers: " << "\n";
+                    for (unsigned i = 0; i < qs.size(); i++)
+                        tout << mk_ismt2_pp(qs[i], m) << "\n"; );
+            }
+            for (unsigned i = 0; i < qs.size(); i++) {
+                quantifier * q = qs[i];
+                TRACE("search_log_instance", tout << mk_ismt2_pp(instance, m) << std::endl;);
+                unsigned num_bindings;
+                ptr_vector<smt::enode> bindings;
+                mk_instance_bindings(instance, num_bindings, bindings);
+                if (m_qmanager.add_instance(q, num_bindings, bindings.c_ptr())) {
+                    r = true;
+                    m_qmanager.propagate();
+                }
+                else
+                    m_redundant_instances++;
+            }
             return r;
         }
     }

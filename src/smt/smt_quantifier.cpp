@@ -89,17 +89,14 @@ namespace smt {
             m_plugin->add(q);
         }
 
-        bool find(symbol const & qid, quantifier * & q) const {
-            ptr_vector<quantifier> * qs;
-            if (!m_qid2qs.find(qid, qs))
+        bool find(symbol const & qid, ptr_vector<quantifier> & qs) const {
+            ptr_vector<quantifier> * r;
+            if (!m_qid2qs.find(qid, r))
                 return false;
-            else
-                if (qs->size() == 0)
-                    return false;
-                else {
-                    q = qs->get(0);
-                    return true;
-                }
+            else {
+                qs = *r;
+                return qs.size() != 0;
+            }
         }
 
         symbol const & get_qid(quantifier * q) const {
@@ -401,8 +398,8 @@ namespace smt {
         m_imp->del(q);
     }
 
-    bool quantifier_manager::find(symbol const & qid, quantifier * & q) const {
-        return m_imp->find(qid, q);
+    bool quantifier_manager::find(symbol const & qid, ptr_vector<quantifier> & qs) const {
+        return m_imp->find(qid, qs);
     }
 
     symbol const & quantifier_manager::get_qid(quantifier * q) const {

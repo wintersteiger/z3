@@ -36,6 +36,7 @@ namespace smt {
         params_ref           m_pp_params;
         std::ofstream      * m_strm;
         std::streampos       m_before_last_cmd;
+        unsigned             m_redundant_instances;
 
     public:
         search_log(ast_manager & m, context & ctx, quantifier_manager & qm);
@@ -51,7 +52,7 @@ namespace smt {
         void log_instance(quantifier * q, unsigned num_bindings, enode * const * bindings, expr_ref instance, unsigned generation, unsigned scope);
         void check_sat(lbool expected_result, statistics stats, unsigned num_assumptions = 0);
 
-        bool is_instance(expr const * e, quantifier * & q) const;
+        bool is_instance(expr const * e, ptr_vector<quantifier> & qs) const;
         void mk_instance_bindings(expr const * e, unsigned & num_bindings, ptr_vector<enode> & bindings);
         bool replay_instance(expr_ref const & instance);
 

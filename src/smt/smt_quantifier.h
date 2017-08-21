@@ -46,7 +46,7 @@ namespace smt {
         void del(quantifier * q);
         bool empty() const;
 
-        bool find(symbol const & qid, quantifier * & q) const;
+        bool find(symbol const & qid, ptr_vector<quantifier> & qs) const;
         symbol const & get_qid(quantifier * q) const;
         void assign_qid(quantifier * q);
         void unassign_qid(quantifier * q);

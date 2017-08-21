@@ -229,7 +229,9 @@ namespace smt {
         m_subst(q, num_bindings, bindings, instance);
 
         TRACE("qi_queue", tout << "new instance:\n" << mk_pp(instance, m_manager) << "\n";);
-        TRACE("qi_queue_instance", tout << "new instance:\n" << mk_pp(instance, m_manager) << "\n";);
+        TRACE("qi_queue_instance", tout << "new instance (of " << q->get_qid() << "):\n" <<
+            "q: " << mk_ismt2_pp(q, m_manager) << "\n" <<
+            mk_pp(instance, m_manager) << "\n";);
         expr_ref  s_instance(m_manager);
         proof_ref pr(m_manager);
         simplifier & simp = m_context.get_simplifier();
