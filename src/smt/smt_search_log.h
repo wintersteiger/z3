@@ -21,9 +21,9 @@ Revision History:
 
 #include<fstream>
 
-#include"ast.h"
-#include"smt_quantifier.h"
-#include"smt_conflict_resolution.h"
+#include "ast/ast.h"
+#include "smt/smt_quantifier.h"
+#include "smt/smt_conflict_resolution.h"
 
 namespace smt {
 

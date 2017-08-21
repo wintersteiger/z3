@@ -16,11 +16,11 @@ Author:
 Revision History:
 
 --*/
-#include"ast.h"
-#include"ast_smt2_pp.h"
-#include"smt_context.h"
+#include "ast/ast.h"
+#include "ast/ast_smt2_pp.h"
+#include "smt/smt_context.h"
 
-#include"smt_search_log.h"
+#include "smt/smt_search_log.h"
 
 namespace smt {
 
