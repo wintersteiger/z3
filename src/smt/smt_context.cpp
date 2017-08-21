@@ -129,7 +129,7 @@ namespace smt {
         return literal(v, lit.sign());
     }
 
-    bool context::get_cancel_flag() { 
+    bool context::get_cancel_flag() {
         return !m_manager.limit().inc();
     }
 
@@ -2414,25 +2414,25 @@ namespace smt {
         try {
             if (m_manager.has_trace_stream())
                 m_manager.trace_stream() << "[pop] " << num_scopes << " " << m_scope_lvl << "\n";
-            
+
             TRACE("context", tout << "backtracking: " << num_scopes << " from " << m_scope_lvl << "\n";);
             TRACE("pop_scope_detail", display(tout););
             SASSERT(num_scopes > 0);
             SASSERT(num_scopes <= m_scope_lvl);
             SASSERT(m_scopes.size() == m_scope_lvl);
-            
+
             unsigned new_lvl = m_scope_lvl - num_scopes;
-            
+
             cache_generation(new_lvl);
             m_qmanager->pop(num_scopes);
             m_case_split_queue->pop_scope(num_scopes);
-            
+
             TRACE("pop_scope", tout << "backtracking: " << num_scopes << ", new_lvl: " << new_lvl << "\n";);
             scope & s = m_scopes[new_lvl];
             TRACE("context", tout << "backtracking new_lvl: " << new_lvl << "\n";);
-            
+
             unsigned units_to_reassert_lim = s.m_units_to_reassert_lim;
-            
+
             if (new_lvl < m_base_lvl) {
                 base_scope & bs = m_base_scopes[new_lvl];
                 del_clauses(m_lemmas, bs.m_lemmas_lim);
@@ -2449,35 +2449,35 @@ namespace smt {
                 m_not_l = null_literal;
             }
             del_clauses(m_aux_clauses, s.m_aux_clauses_lim);
-            
+
             m_relevancy_propagator->pop(num_scopes);
-            
+
             m_fingerprints.pop_scope(num_scopes);
             unassign_vars(s.m_assigned_literals_lim);
             undo_trail_stack(s.m_trail_stack_lim);
-            
+
             for (theory* th : m_theory_set) {
                 th->pop_scope_eh(num_scopes);
             }
-            
+
             del_justifications(m_justifications, s.m_justifications_lim);
-            
+
             m_asserted_formulas.pop_scope(num_scopes);
-            
+
             m_eq_propagation_queue.reset();
             m_th_eq_propagation_queue.reset();
             m_th_diseq_propagation_queue.reset();
             m_atom_propagation_queue.reset();
-            
+
             m_region.pop_scope(num_scopes);
             m_scopes.shrink(new_lvl);
-            
+
             m_scope_lvl = new_lvl;
             if (new_lvl < m_base_lvl) {
                 m_base_lvl = new_lvl;
                 m_search_lvl = new_lvl; // Remark: not really necessary
             }
-            
+
             unsigned num_bool_vars = get_num_bool_vars();
             // any variable >= num_bool_vars was deleted during backtracking.
             reinit_clauses(num_scopes, num_bool_vars);
