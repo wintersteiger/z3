@@ -97,9 +97,11 @@ public:
 class decide_cmd : public cmd {
     expr * m_decision;
     bool   m_ignore;
+    bool   m_ignore_lemmas;
 
 public:
-    decide_cmd(bool ignore) : cmd("decide"), m_decision(0), m_ignore(ignore) {}
+    decide_cmd(bool ignore, bool ignore_lemmas) :
+        cmd("decide"), m_decision(0), m_ignore(ignore), m_ignore_lemmas(ignore_lemmas) {}
     virtual char const * get_usage() const { return "<term>"; }
     virtual char const * get_descr(cmd_context & ctx) const { return "add a decision"; }
     virtual unsigned get_arity() const { return 1; }
@@ -119,11 +121,15 @@ public:
         ref<solver> slvr = hacked_ctx->get_solver();
         SASSERT(slvr);
 
-        // Decisions include 1 push, so that the assertion will be 
-        // backtracked if it's wrong (at the next lemma cmd).
-        ctx.push();
-        if (!m_ignore)
-            slvr->assert_expr(m_decision); 
+        if (!m_ignore || !m_ignore_lemmas) {
+            // Decisions include 1 push, so that the assertion will be
+            // backtracked if it's wrong (at the next lemma cmd).
+            ctx.push();
+        }
+
+        if (!m_ignore) {
+            slvr->assert_expr(m_decision);
+        }
     }
     virtual void prepare(cmd_context & ctx) { reset(ctx); }
     virtual void reset(cmd_context& ctx) {
@@ -139,9 +145,11 @@ class lemma_cmd : public cmd {
     expr       * m_lemma;
     unsigned     m_levels;
     bool         m_ignore;
+    bool         m_ignore_decisions;
 
 public:
-    lemma_cmd(bool ignore) : cmd("lemma"), m_lemma(0), m_levels(UINT_MAX), m_ignore(ignore) { }
+    lemma_cmd(bool ignore, bool ignore_decisions) :
+        cmd("lemma"), m_lemma(0), m_levels(UINT_MAX), m_ignore(ignore), m_ignore_decisions(ignore_decisions) { }
     virtual char const * get_usage() const { return "<number> <term>"; }
     virtual char const * get_descr(cmd_context & ctx) const { return "backtrack <number> levels and add a (checked) lemma"; }
     virtual unsigned get_arity() const { return 2; }
@@ -168,9 +176,10 @@ public:
         ref<solver> slvr = hacked_ctx->get_solver();
         SASSERT(slvr);
         SASSERT(m_lemma);
-        
+
         if (m_ignore) {
-            slvr->pop(m_levels);
+            if (!m_ignore_decisions)
+                slvr->pop(m_levels);
         }
         else {
             expr_ref not_lemma(m.mk_not(m_lemma), m);
@@ -275,13 +284,13 @@ protected:
     void setup_env(cmd_context & ctx) {
         bool ignore_decisions = gparams::get_value("smt.search_log.replay.ignore_decisions") == "true";
         bool ignore_lemmas = gparams::get_value("smt.search_log.replay.ignore_lemmas") == "true";
-        
+
         ctx.m().new_func_decl_eh = &new_func_decl_eh;
         ctx.m().erase_func_decl_eh = &erase_func_decl_eh;
 
         ctx.insert(m_add_instance_cmd = alloc(add_instance_cmd));
-        ctx.insert(m_decide_cmd = alloc(decide_cmd, ignore_decisions));
-        ctx.insert(m_lemma_cmd = alloc(lemma_cmd, ignore_lemmas));
+        ctx.insert(m_decide_cmd = alloc(decide_cmd, ignore_decisions, ignore_lemmas));
+        ctx.insert(m_lemma_cmd = alloc(lemma_cmd, ignore_lemmas, ignore_decisions));
 
         m_ctx_params_before = ctx.params();
         m_global_decls_before = ctx.global_decls();
@@ -310,7 +319,7 @@ protected:
         gparams::set("smt.ematching", m_ematching_before.c_str());
 
         ctx.params() = m_ctx_params_before;
-        ctx.set_global_decls_unsafe(m_global_decls_before);                
+        ctx.set_global_decls_unsafe(m_global_decls_before);
     }
 
 public:
@@ -333,7 +342,7 @@ public:
         nasty_hack * hacked_ctx = reinterpret_cast<nasty_hack*>(&ctx);
         ref<solver> slvr = hacked_ctx->get_solver();
         SASSERT(slvr);
-                        
+
         slvr->push(); // forces internalization
 
         std::ifstream strm(m_log_filename.c_str());
@@ -348,7 +357,7 @@ public:
         slvr->pop(1);
 
         ctx.set_check_sat_result(slvr.get());
-        
+
         IF_VERBOSE(10, verbose_stream() << "(smt.end-of-replay)" << std::endl; );
     }
     virtual void prepare(cmd_context & ctx) { reset(ctx); }
