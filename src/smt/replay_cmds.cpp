@@ -30,8 +30,8 @@ class nasty_hack : public cmd_context {
 public:
     ref<solver> const & get_solver() const { return m_solver; }
     void set_solver(ref<solver> & s) { m_solver = s; }
-    unsigned get_num_assumptions() const { static_cast<solver_na2as*>(m_solver.get())->get_num_assumptions(); }
-    expr * get_assumption(unsigned i) { static_cast<solver_na2as*>(m_solver.get())->get_assumption(i); }
+    unsigned get_num_assumptions() const { return static_cast<solver_na2as*>(m_solver.get())->get_num_assumptions(); }
+    expr * get_assumption(unsigned i) { return static_cast<solver_na2as*>(m_solver.get())->get_assumption(i); }
 };
 
 class add_instance_cmd : public cmd {
@@ -116,7 +116,7 @@ public:
     virtual void failure_cleanup(cmd_context & ctx) {}
     virtual void execute(cmd_context & ctx) {
         IF_VERBOSE(11, verbose_stream() << "(smt.replay.decide)" << std::endl; );
-        ast_manager & m = ctx.m();
+        // ast_manager & m = ctx.m();
         nasty_hack * hacked_ctx = reinterpret_cast<nasty_hack*>(&ctx);
         ref<solver> slvr = hacked_ctx->get_solver();
         SASSERT(slvr);

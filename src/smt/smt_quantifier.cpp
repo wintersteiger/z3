@@ -133,8 +133,8 @@ namespace smt {
                     sstr << lqid;
                     qid = symbol(sstr.str().c_str());
                     TRACE("qi_log_instance_detail",
-                        tout << "Assigning quantifier lqid=" << lqid << std::endl;
-                    tout << mk_ismt2_pp(q, m) << std::endl; );
+                        tout << "Assigning quantifier lqid=" << lqid << "\n";
+                        tout << mk_ismt2_pp(q, m) << "\n"; );
                     m_q2lqid.insert(q, lqid);
                 }
             }
@@ -152,7 +152,7 @@ namespace smt {
 
         void unassign_qid(quantifier * q) {
             symbol const & qid = get_qid(q);
-            TRACE("qi_log_instance_detail", tout << "Unassign quantifier " << qid << std::endl; );
+            TRACE("qi_log_instance_detail", tout << "Unassign quantifier " << qid << "\n"; );
 
             unsigned lqid;
             if (m_q2lqid.find(q, lqid)) {
@@ -186,7 +186,7 @@ namespace smt {
         }
 
         void del(quantifier * q) {
-            TRACE("del_quantifier_qm", tout << "Deleting quantifier '" << q->get_qid() << "'." << std::endl;);
+            TRACE("del_quantifier_qm", tout << "Deleting quantifier '" << q->get_qid() << "'." << "\n";);
             if (m_params.m_qi_profile) {
                 display_stats(verbose_stream(), q);
             }
