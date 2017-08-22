@@ -1547,9 +1547,9 @@ void ast_manager::compress_ids() {
     if (new_func_decl_eh) {
         ast_table::iterator it = m_ast_table.begin();
         ast_table::iterator end = m_ast_table.end();
-        for (; it2 != end2; ++it2) {
-            if (is_func_decl(*it2))
-                new_func_decl_eh(to_func_decl(*it2));
+        for (; it != end; ++it) {
+            if (is_func_decl(*it))
+                new_func_decl_eh(to_func_decl(*it));
         }
     }
 }
