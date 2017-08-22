@@ -17,14 +17,14 @@ Notes:
 --*/
 #include<fstream>
 
-#include"smt2parser.h"
-#include"cmd_context.h"
-#include"gparams.h"
-#include"func_decl_dependencies.h"
-#include"for_each_expr.h"
-#include"smt_solver.h"
-#include"solver_na2as.h"
-#include"replay_cmds.h"
+#include "parsers/smt2/smt2parser.h"
+#include "cmd_context/cmd_context.h"
+#include "util/gparams.h"
+#include "ast/func_decl_dependencies.h"
+#include "ast/for_each_expr.h"
+#include "smt/smt_solver.h"
+#include "solver/solver_na2as.h"
+#include "smt/replay_cmds.h"
 
 class nasty_hack : public cmd_context {
 public:
