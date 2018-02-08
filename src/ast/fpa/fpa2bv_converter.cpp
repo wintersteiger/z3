@@ -21,6 +21,7 @@ Notes:
 #include "ast/ast_smt2_pp.h"
 #include "ast/well_sorted.h"
 #include "ast/rewriter/th_rewriter.h"
+#include "smt/elim_term_ite.h"
 
 #include "ast/fpa/fpa2bv_converter.h"
 #include "ast/rewriter/fpa_rewriter.h"
@@ -2628,8 +2629,30 @@ void fpa2bv_converter::mk_to_fp_real(func_decl * f, sort * s, expr * rm, expr * 
         expr_ref rme(bv_rm, m);
         round(s, rme, sgn, sig, exp, result);
 
-        expr * e = m.mk_eq(m_util.mk_to_real(result), x);
-        m_extra_assertions.push_back(e);
+        expr_ref is_neg(m), is_nan(m), is_inf(m), is_den(m);
+        mk_is_neg(result, is_neg);
+        mk_is_nan(result, is_nan);
+        mk_is_inf(result, is_inf);
+        mk_is_denormal(result, is_den);
+        m_extra_assertions.push_back(m.mk_not(is_nan));
+        m_extra_assertions.push_back(m.mk_not(is_inf));
+
+        expr_ref usgn(m), uexp(m), usig(m), ulz(m);
+        unpack(result, usgn, usig, uexp, ulz, true);
+
+        expr_ref re(m), rs(m), rt(m);
+        re = m_arith_util.mk_to_real(m_bv_util.mk_bv2int(uexp));
+        rs = m_arith_util.mk_to_real(m_bv_util.mk_bv2int(usig));
+        rs = m.mk_ite(is_neg, m_arith_util.mk_uminus(rs), rs);
+
+        rt = m_arith_util.mk_power(m_arith_util.mk_real(2),
+                                   m_arith_util.mk_sub(re, m_arith_util.mk_real(sbits-1)));
+
+        expr_ref rf(m), c(m);
+        rf = m_arith_util.mk_mul(rt, rs);
+        c = m_arith_util.mk_le(x, rf);
+        elim_term_ite_rw(m, defined_names(m))(c, c);
+        //m_extra_assertions.push_back(c);
     }
 
     SASSERT(is_well_sorted(m, result));
