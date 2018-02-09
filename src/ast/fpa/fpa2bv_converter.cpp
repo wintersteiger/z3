@@ -2651,7 +2651,9 @@ void fpa2bv_converter::mk_to_fp_real(func_decl * f, sort * s, expr * rm, expr * 
         expr_ref rf(m), c(m);
         rf = m_arith_util.mk_mul(rt, rs);
         c = m_arith_util.mk_le(x, rf);
-        elim_term_ite_rw(m, defined_names(m))(c, c);
+        defined_names dn(m);
+        elim_term_ite_rw rw(m, dn);
+        rw(c, c);
         //m_extra_assertions.push_back(c);
     }
 
