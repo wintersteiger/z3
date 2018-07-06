@@ -2613,6 +2613,7 @@ void fpa2bv_converter::mk_to_fp_real(func_decl * f, sort * s, expr * rm, expr * 
         SASSERT(!m_arith_util.is_numeral(x));
         bv_util & bu = m_bv_util;
         arith_util & au = m_arith_util;
+        unsigned bv_size = ebits + sbits;
 
         expr_ref bv0(m), bv1(m), zero(m), two(m);
         bv0 = bu.mk_numeral(0, 1);
@@ -2622,13 +2623,57 @@ void fpa2bv_converter::mk_to_fp_real(func_decl * f, sort * s, expr * rm, expr * 
 
         expr_ref sgn(m), sig(m), exp(m);
         sgn = mk_fresh_const("fpa2bv_to_fp_real_sgn", 1);
-        sig = mk_fresh_const("fpa2bv_to_fp_real_sig", sbits + 4);
-        exp = mk_fresh_const("fpa2bv_to_fp_real_exp", ebits + 2);
+        sig = mk_fresh_const("fpa2bv_to_fp_real_sig", sbits);
+        exp = mk_fresh_const("fpa2bv_to_fp_real_exp", ebits);
 
-        expr_ref rme(bv_rm, m);
-        round(s, rme, sgn, sig, exp, result);
+        result = m_util.mk_fp(sgn, sig, exp);
 
-        expr * e = m.mk_eq(m_util.mk_to_real(result), x);
+        expr_ref result_is_nan(m);
+        mk_is_nan(result, result_is_nan);
+        m_extra_assertions.push_back(m.mk_not(result_is_nan));
+
+        expr_ref rbv(m);
+        split_fp(result, sgn, sig, exp);
+        rbv = bu.mk_concat(sgn, bu.mk_concat(exp, sig));
+
+        expr_ref bvsz0(m), bvsz1(m), nubv(m), ndbv(m);
+        bvsz1 = bu.mk_numeral(0, bv_size);
+        bvsz1 = bu.mk_numeral(1, bv_size);
+        nubv = bu.mk_bv_add(rbv, bvsz1);
+        ndbv = bu.mk_bv_sub(rbv, bvsz1);
+        SASSERT(bu.get_bv_size(nubv) == bv_size);
+        SASSERT(bu.get_bv_size(ndbv) == bv_size);
+
+        expr_ref pinf(m), ninf(m), ovfl(m), udfl(m);
+        pinf = bu.mk_concat(bv0, bu.mk_bv_neg(bu.mk_numeral(1, ebits)));
+        ninf = bu.mk_concat(bv1, bu.mk_bv_neg(bu.mk_numeral(1, ebits)));
+        ovfl = m.mk_or(m.mk_eq(nubv, bvsz0),
+                       m.mk_eq(bu.mk_extract(bv_size - 1, sbits, nubv), pinf));
+        udfl = m.mk_or(m.mk_eq(ndbv, bu.mk_bv_neg(bvsz1)),
+                       m.mk_eq(bu.mk_extract(bv_size - 1, sbits, ndbv), ninf));
+        dbg_decouple("fpa2bv_to_fp_real_ovfl", ovfl);
+        dbg_decouple("fpa2bv_to_fp_real_udfl", udfl);
+
+        expr_ref nuf(m), ndf(m);
+        expr_ref_vector nuas(m);
+        nuas[0] = bu.mk_extract(bv_size - 1, bv_size - 1, nubv);
+        nuas[1] = bu.mk_extract(bv_size - 2, sbits - 1, nubv);
+        nuas[2] = bu.mk_extract(sbits - 2, 0, nubv);
+        mk_to_fp(f, 3, nuas.c_ptr(), nuf);
+        expr_ref_vector ndas(m);
+        ndas[0] = bu.mk_extract(ebits + sbits - 1, ebits + sbits - 1, ndbv);
+        ndas[1] = bu.mk_extract(ebits + sbits - 2, sbits - 1, ndbv);
+        ndas[2] = bu.mk_extract(sbits - 2, 0, ndbv);
+        mk_to_fp(f, 3, ndas.c_ptr(), ndf);
+
+        expr_ref nur(m), ndr(m);
+        nur = m_util.mk_to_real(nuf);
+        ndr = m_util.mk_to_real(ndf);
+
+        // Todo: le/lt depends on rounding mode.
+        expr_ref e(m);
+        e = m.mk_and(m.mk_or(udfl, au.mk_le(ndr, x)),
+                     m.mk_or(ovfl, au.mk_le(x, nur)));
         m_extra_assertions.push_back(e);
     }
 
@@ -3707,7 +3752,7 @@ void fpa2bv_converter::mk_rounding_mode(decl_kind k, expr_ref & result)
 
 void fpa2bv_converter::dbg_decouple(const char * prefix, expr_ref & e) {
 #ifdef Z3DEBUG
-    return;
+    //return;
     // CMW: This works only for quantifier-free formulas.
     if (m_util.is_fp(e)) {
         expr_ref new_bv(m);

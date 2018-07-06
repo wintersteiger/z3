@@ -141,7 +141,7 @@ br_status fpa2bv_rewriter_cfg::reduce_app(func_decl * f, unsigned num, expr * co
         case OP_FPA_IS_SUBNORMAL: m_conv.mk_is_subnormal(f, num, args, result); return BR_DONE;
         case OP_FPA_IS_POSITIVE: m_conv.mk_is_positive(f, num, args, result); return BR_DONE;
         case OP_FPA_IS_NEGATIVE: m_conv.mk_is_negative(f, num, args, result); return BR_DONE;
-        case OP_FPA_TO_FP: m_conv.mk_to_fp(f, num, args, result); return BR_DONE;
+        case OP_FPA_TO_FP: m_conv.mk_to_fp(f, num, args, result); return BR_REWRITE1;
         case OP_FPA_TO_FP_UNSIGNED: m_conv.mk_to_fp_unsigned(f, num, args, result); return BR_DONE;
         case OP_FPA_FP: m_conv.mk_fp(f, num, args, result); return BR_DONE;
         case OP_FPA_TO_UBV: m_conv.mk_to_ubv(f, num, args, result); return BR_DONE;
